@@ -1,58 +1,59 @@
 package com.example.silomonitorapp.ui.theme
 
-import android.app.Activity
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
-
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
-)
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = RojoAriztia,
     onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primaryContainer = Color(0xFFFFDAD6),
+    onPrimaryContainer = Color(0xFF410002),
+    secondary = AmarilloMostaza,
+    onSecondary = TextoPrincipal,
+    secondaryContainer = Color(0xFFFFF3C4),
+    onSecondaryContainer = TextoPrincipal,
+    background = GrisHielo,
+    onBackground = TextoPrincipal,
+    surface = BlancoTarjeta,
+    onSurface = TextoPrincipal,
+    surfaceVariant = Color(0xFFF1F3F4),
+    onSurfaceVariant = TextoSecundario,
+    error = SemaforoCritico,
+)
+
+private val DarkColorScheme = darkColorScheme(
+    primary = RojoAriztiaClaro,
+    onPrimary = Color.White,
+    secondary = AmarilloMostaza,
+    onSecondary = TextoPrincipal,
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E1E),
+)
+
+// Tarjetas y superficies con bordes redondeados de 12dp
+private val AriztiaShapes = Shapes(
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
 )
 
 @Composable
 fun SiloMonitorAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
+    // Sin color dinámico: la app siempre respeta la paleta corporativa
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
         typography = Typography,
+        shapes = AriztiaShapes,
         content = content
     )
 }
