@@ -1,5 +1,7 @@
 package com.example.silomonitorapp.ui.model
 
+import com.example.silomonitorapp.domain.ReglasTerreno
+
 /**
  * Modelo de presentación que consumen las pantallas.
  * Al integrar Room, el ViewModel debe mapear SiloEntity -> SiloUi.
@@ -25,7 +27,7 @@ data class SiloUi(
 
     /** Horas de autonomía = (Stock actual / Consumo promedio diario) * 24 */
     val horasAutonomia: Double?
-        get() = if (consumoPromedioDiarioKg > 0.0) stockActualKg / consumoPromedioDiarioKg * 24 else null
+        get() = ReglasTerreno.horasAutonomia(stockActualKg, consumoPromedioDiarioKg)
 }
 
 enum class EstadoSilo(val etiqueta: String) {

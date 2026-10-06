@@ -1,5 +1,6 @@
 package com.example.silomonitorapp.data.local
 
+import com.example.silomonitorapp.domain.ReglasTerreno
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -17,22 +18,8 @@ class SiloRepository(private val siloDao: SiloDao) {
         val silo = siloDao.obtenerSiloPorId(idSilo)
             ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
 
-        val nuevoNivel = if (esCarga) {
-            silo.nivelActual + cantidadKg
-        } else {
-            silo.nivelActual - cantidadKg
-        }
-
-        // Regla 1: Bloqueo de Sobrellenado
-        if (nuevoNivel > silo.capacidadMaxima) {
-            val exceso = nuevoNivel - silo.capacidadMaxima
-            return@withContext Result.failure(Exception("Bloqueo de Sobrellenado: Excede la capacidad por ${exceso.toInt()} kg."))
-        }
-
-        // Regla 2: Prevención de Saldo Negativo
-        if (nuevoNivel < 0) {
-            return@withContext Result.failure(Exception("Prevención de Saldo Negativo: Stock insuficiente (${silo.nivelActual.toInt()} kg disponibles)."))
-        }
+        val nuevoNivel = ReglasTerreno.calcularNuevoNivel(silo.nivelActual, silo.capacidadMaxima, cantidadKg, esCarga)
+            .getOrElse { return@withContext Result.failure(it) }
 
         siloDao.actualizarNivel(idSilo, nuevoNivel)
         Result.success(Unit)
