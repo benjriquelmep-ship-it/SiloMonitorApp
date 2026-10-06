@@ -15,6 +15,9 @@ interface SiloDao {
     @Query("SELECT * FROM silos WHERE id = :id LIMIT 1")
     fun obtenerSiloPorId(id: String): SiloEntity?
 
+    @Query("SELECT COUNT(*) FROM silos")
+    fun contarSilos(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertarOActualizarSilos(silos: List<SiloEntity>): List<Long>
 

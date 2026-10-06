@@ -13,7 +13,8 @@ data class SiloEntity(
     val tipoAlimento: String,
     val capacidadMaxima: Double,
     val nivelActual: Double,
-    val consumoPromedioDiario: Double = 1500.0, // kg diarios para cálculo de autonomía
-    val latitud: Double = -33.6892,
-    val longitud: Double = -71.2178
+    val consumoPromedioDiario: Double, // kg diarios para cálculo de autonomía
+    // Sin valor por defecto: cada silo debe tener su propia ubicación en el mapa
+    val latitud: Double,
+    val longitud: Double
 )
