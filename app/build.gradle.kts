@@ -3,7 +3,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    id("com.google.gms.google-services")
+    alias(libs.plugins.ksp)
 }
 
 // La API key de Google Maps se lee desde local.properties (MAPS_API_KEY=...), nunca se sube al repo
@@ -65,11 +65,21 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
     implementation("androidx.compose.material:material-icons-extended:1.7.0")
 
-    // Persistencia Local: Room Database (con procesador estándar)
+    // Persistencia Local: Room Database
     val roomVersion = "2.6.1"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
-    annotationProcessor("androidx.room:room-compiler:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // CameraX (Cámara para escaneo QR)
+    val cameraxVersion = "1.3.4"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // Google ML Kit Barcode Scanning (Lector de QR)
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 
     // Google Maps + GPS
     implementation("com.google.maps.android:maps-compose:6.4.1")
