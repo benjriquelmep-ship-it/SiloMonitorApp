@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.silomonitorapp.data.local.AppDatabase
 import com.example.silomonitorapp.data.local.SiloRepository
+import com.example.silomonitorapp.notificaciones.NotificadorAlertas
+import com.example.silomonitorapp.ui.model.EstadoSilo
 import com.example.silomonitorapp.ui.model.SiloUi
 import com.example.silomonitorapp.ui.model.TipoMovimiento
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,8 +80,12 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
         val esCarga = tipo == TipoMovimiento.CARGA
         val resultado = repository.registrarMovimiento(idSilo, cantidadKg, esCarga)
         return resultado.fold(
-            onSuccess = {
+            onSuccess = { siloActualizado ->
                 _mensajeOperacion.value = if (esCarga) "Carga registrada con éxito" else "Consumo registrado con éxito"
+                val porcentaje = (siloActualizado.nivelActual / siloActualizado.capacidadMaxima * 100).toFloat()
+                if (EstadoSilo.desdePorcentaje(porcentaje) == EstadoSilo.CRITICO) {
+                    NotificadorAlertas.notificarNivelCritico(getApplication(), siloActualizado)
+                }
                 null
             },
             onFailure = { error -> error.message ?: "No se pudo registrar el movimiento" }

@@ -14,7 +14,8 @@ class SiloRepository(private val siloDao: SiloDao) {
     }
 
     // Reglas de negocio de terreno (Ariztía)
-    suspend fun registrarMovimiento(idSilo: String, cantidadKg: Double, esCarga: Boolean): Result<Unit> = withContext(Dispatchers.IO) {
+    // Devuelve el silo con su nivel actualizado
+    suspend fun registrarMovimiento(idSilo: String, cantidadKg: Double, esCarga: Boolean): Result<SiloEntity> = withContext(Dispatchers.IO) {
         val silo = siloDao.obtenerSiloPorId(idSilo)
             ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
 
@@ -22,7 +23,7 @@ class SiloRepository(private val siloDao: SiloDao) {
             .getOrElse { return@withContext Result.failure(it) }
 
         siloDao.actualizarNivel(idSilo, nuevoNivel)
-        Result.success(Unit)
+        Result.success(silo.copy(nivelActual = nuevoNivel))
     }
 
     // Datos semilla iniciales coincidentes con la UI de Ariztía (cada silo con su propia ubicación)
