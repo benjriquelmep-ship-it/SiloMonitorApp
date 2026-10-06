@@ -13,7 +13,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -38,6 +42,12 @@ import com.example.silomonitorapp.ui.components.color
 import com.example.silomonitorapp.ui.components.formatearAutonomia
 import com.example.silomonitorapp.ui.components.formatearKg
 import com.example.silomonitorapp.ui.model.EstadoSilo
+import com.example.silomonitorapp.ui.model.MovimientoUi
+import com.example.silomonitorapp.ui.model.TipoMovimiento
+import com.example.silomonitorapp.ui.theme.SemaforoNormal
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.example.silomonitorapp.ui.model.SiloUi
 import com.example.silomonitorapp.ui.model.silosDemo
 import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
@@ -48,6 +58,7 @@ fun SiloDetailScreen(
     onVolver: () -> Unit,
     onRegistrarMovimiento: (SiloUi) -> Unit,
     onVerEnMapa: (SiloUi) -> Unit,
+    movimientos: List<MovimientoUi> = emptyList(),
 ) {
     Scaffold(
         topBar = { AriztiaTopBar(titulo = silo?.nombre ?: "Silo", onVolver = onVolver) },
@@ -130,6 +141,71 @@ fun SiloDetailScreen(
                 Spacer(Modifier.width(8.dp))
                 Text("Ver en el mapa")
             }
+
+            HistorialMovimientos(movimientos)
+        }
+    }
+}
+
+private val formatoFecha = SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag("es-CL"))
+
+@Composable
+private fun HistorialMovimientos(movimientos: List<MovimientoUi>) {
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text("Últimos movimientos", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            if (movimientos.isEmpty()) {
+                Text(
+                    "Aún no hay movimientos registrados.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            movimientos.forEachIndexed { indice, movimiento ->
+                FilaMovimiento(movimiento)
+                if (indice < movimientos.lastIndex) HorizontalDivider()
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilaMovimiento(movimiento: MovimientoUi) {
+    val esCarga = movimiento.tipo == TipoMovimiento.CARGA
+    val colorTipo = if (esCarga) SemaforoNormal else MaterialTheme.colorScheme.primary
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            if (esCarga) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
+            contentDescription = movimiento.tipo.etiqueta,
+            tint = colorTipo,
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "${movimiento.tipo.etiqueta} ${if (esCarga) "+" else "−"}${formatearKg(movimiento.cantidadKg)}",
+                fontWeight = FontWeight.SemiBold,
+                color = colorTipo,
+            )
+            Text(
+                formatoFecha.format(Date(movimiento.fecha)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (movimiento.observacion.isNotBlank()) {
+                Text(movimiento.observacion, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        if (movimiento.tieneFoto) {
+            Icon(Icons.Filled.PhotoCamera, contentDescription = "Con foto de evidencia", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (movimiento.pendienteSincronizar) {
+            Spacer(Modifier.width(8.dp))
+            Icon(Icons.Filled.CloudOff, contentDescription = "Pendiente de sincronizar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

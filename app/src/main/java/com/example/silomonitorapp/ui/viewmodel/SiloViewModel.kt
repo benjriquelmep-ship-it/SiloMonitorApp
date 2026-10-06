@@ -9,8 +9,10 @@ import com.example.silomonitorapp.data.local.AppDatabase
 import com.example.silomonitorapp.data.local.SiloRepository
 import com.example.silomonitorapp.notificaciones.NotificadorAlertas
 import com.example.silomonitorapp.ui.model.EstadoSilo
+import com.example.silomonitorapp.ui.model.MovimientoUi
 import com.example.silomonitorapp.ui.model.SiloUi
 import com.example.silomonitorapp.ui.model.TipoMovimiento
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +33,7 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val db = AppDatabase.obtenerBaseDatos(application)
-        repository = SiloRepository(db.siloDao())
+        repository = SiloRepository(db)
 
         // Convierte cada SiloEntity de Room a SiloUi en tiempo real
         silosUi = repository.silosFlow.map { lista ->
@@ -65,6 +67,22 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Últimos movimientos del silo, del más reciente al más antiguo. */
+    fun historial(siloId: String): Flow<List<MovimientoUi>> =
+        repository.historialFlow(siloId).map { lista ->
+            lista.map { m ->
+                MovimientoUi(
+                    id = m.id,
+                    tipo = if (m.tipo == "CARGA") TipoMovimiento.CARGA else TipoMovimiento.CONSUMO,
+                    cantidadKg = m.cantidadKg,
+                    fecha = m.fecha,
+                    observacion = m.observacion,
+                    tieneFoto = m.fotoUri != null,
+                    pendienteSincronizar = m.pendienteSincronizar
+                )
+            }
+        }
+
     /** Indica si el código leído (QR o manual) corresponde a un silo registrado. */
     suspend fun existeSilo(codigo: String): Boolean {
         val existe = repository.obtenerSiloPorId(codigo) != null
@@ -76,9 +94,15 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
      * Aplica las reglas de terreno (sobrellenado y saldo negativo) y guarda el movimiento.
      * Devuelve el mensaje de error para mostrarlo en el formulario, o null si se registró.
      */
-    suspend fun registrarMovimiento(idSilo: String, tipo: TipoMovimiento, cantidadKg: Double): String? {
+    suspend fun registrarMovimiento(
+        idSilo: String,
+        tipo: TipoMovimiento,
+        cantidadKg: Double,
+        observacion: String = "",
+        fotoUri: String? = null
+    ): String? {
         val esCarga = tipo == TipoMovimiento.CARGA
-        val resultado = repository.registrarMovimiento(idSilo, cantidadKg, esCarga)
+        val resultado = repository.registrarMovimiento(idSilo, cantidadKg, esCarga, observacion, fotoUri)
         return resultado.fold(
             onSuccess = { siloActualizado ->
                 _mensajeOperacion.value = if (esCarga) "Carga registrada con éxito" else "Consumo registrado con éxito"

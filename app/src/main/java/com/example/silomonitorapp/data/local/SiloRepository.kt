@@ -5,9 +5,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
-class SiloRepository(private val siloDao: SiloDao) {
+class SiloRepository(private val db: AppDatabase) {
+
+    private val siloDao = db.siloDao()
+    private val movimientoDao = db.movimientoDao()
 
     val silosFlow: Flow<List<SiloEntity>> = siloDao.obtenerTodosLosSilos()
+
+    fun historialFlow(siloId: String): Flow<List<MovimientoEntity>> = movimientoDao.obtenerPorSilo(siloId)
 
     suspend fun obtenerSiloPorId(id: String): SiloEntity? = withContext(Dispatchers.IO) {
         siloDao.obtenerSiloPorId(id)
@@ -15,14 +20,32 @@ class SiloRepository(private val siloDao: SiloDao) {
 
     // Reglas de negocio de terreno (Ariztía)
     // Devuelve el silo con su nivel actualizado
-    suspend fun registrarMovimiento(idSilo: String, cantidadKg: Double, esCarga: Boolean): Result<SiloEntity> = withContext(Dispatchers.IO) {
+    suspend fun registrarMovimiento(
+        idSilo: String,
+        cantidadKg: Double,
+        esCarga: Boolean,
+        observacion: String = "",
+        fotoUri: String? = null
+    ): Result<SiloEntity> = withContext(Dispatchers.IO) {
         val silo = siloDao.obtenerSiloPorId(idSilo)
             ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
 
         val nuevoNivel = ReglasTerreno.calcularNuevoNivel(silo.nivelActual, silo.capacidadMaxima, cantidadKg, esCarga)
             .getOrElse { return@withContext Result.failure(it) }
 
-        siloDao.actualizarNivel(idSilo, nuevoNivel)
+        // Nivel e historial se guardan juntos: o quedan ambos o ninguno
+        db.runInTransaction {
+            siloDao.actualizarNivel(idSilo, nuevoNivel)
+            movimientoDao.insertar(
+                MovimientoEntity(
+                    siloId = idSilo,
+                    tipo = if (esCarga) "CARGA" else "CONSUMO",
+                    cantidadKg = cantidadKg,
+                    observacion = observacion,
+                    fotoUri = fotoUri
+                )
+            )
+        }
         Result.success(silo.copy(nivelActual = nuevoNivel))
     }
 

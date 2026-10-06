@@ -49,3 +49,14 @@ enum class TipoMovimiento(val etiqueta: String) {
     CARGA("Carga"),
     CONSUMO("Consumo"),
 }
+
+/** Fila del historial de movimientos que se muestra en la ficha del silo. */
+data class MovimientoUi(
+    val id: Long,
+    val tipo: TipoMovimiento,
+    val cantidadKg: Double,
+    val fecha: Long,
+    val observacion: String,
+    val tieneFoto: Boolean,
+    val pendienteSincronizar: Boolean,
+)
