@@ -32,7 +32,7 @@ import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 import java.text.NumberFormat
 import java.util.Locale
 
-private val formatoKg = NumberFormat.getIntegerInstance(Locale("es", "CL"))
+private val formatoKg = NumberFormat.getIntegerInstance(Locale.forLanguageTag("es-CL"))
 
 fun formatearKg(kg: Double): String = "${formatoKg.format(kg)} kg"
 
