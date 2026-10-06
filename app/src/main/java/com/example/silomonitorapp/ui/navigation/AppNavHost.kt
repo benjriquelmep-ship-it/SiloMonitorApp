@@ -1,24 +1,30 @@
 package com.example.silomonitorapp.ui.navigation
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.example.silomonitorapp.ui.model.SilosDemoStore
-import com.example.silomonitorapp.ui.screens.EscanerQrPlaceholderScreen
 import com.example.silomonitorapp.ui.screens.MapaSilosScreen
 import com.example.silomonitorapp.ui.screens.MovimientoFormScreen
+import com.example.silomonitorapp.ui.screens.QrScannerScreen
 import com.example.silomonitorapp.ui.screens.SiloDetailScreen
 import com.example.silomonitorapp.ui.screens.SiloListScreen
+import com.example.silomonitorapp.ui.viewmodel.SiloViewModel
+import kotlinx.coroutines.launch
 
 object Rutas {
     const val ARG_SILO_ID = "siloId"
@@ -38,11 +44,20 @@ private const val DURACION_TRANSICION_MS = 350
 
 @Composable
 fun AppNavHost(
+    viewModel: SiloViewModel,
     navController: NavHostController = rememberNavController(),
-    // TODO(integración): reemplazar por el SiloViewModel con Room
-    store: SilosDemoStore = remember { SilosDemoStore() },
 ) {
-    val silos = store.silos
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val silos by viewModel.silosUi.collectAsState()
+    val mensajeOperacion by viewModel.mensajeOperacion.collectAsState()
+
+    LaunchedEffect(mensajeOperacion) {
+        mensajeOperacion?.let { mensaje ->
+            Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
+            viewModel.limpiarMensaje()
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -67,7 +82,7 @@ fun AppNavHost(
         ) { entrada ->
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             SiloDetailScreen(
-                silo = store.buscar(id),
+                silo = silos.firstOrNull { it.id == id },
                 onVolver = { navController.popBackStack() },
                 onRegistrarMovimiento = { navController.navigate(Rutas.movimiento(it.id)) },
                 onVerEnMapa = { navController.navigate(Rutas.mapa(it.id)) },
@@ -81,14 +96,16 @@ fun AppNavHost(
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             var error by remember { mutableStateOf<String?>(null) }
             MovimientoFormScreen(
-                silo = store.buscar(id),
+                silo = silos.firstOrNull { it.id == id },
                 error = error,
                 onVolver = { navController.popBackStack() },
                 onGuardar = { tipo, kg, _ ->
-                    error = store.aplicarMovimiento(id, tipo, kg)
-                    if (error == null) navController.popBackStack()
+                    scope.launch {
+                        error = viewModel.registrarMovimiento(id, tipo, kg)
+                        if (error == null) navController.popBackStack()
+                    }
                 },
-                onAdjuntarFoto = { /* Cámara de evidencia: Integrante 1 */ },
+                onAdjuntarFoto = { /* TODO: cámara de evidencia */ },
             )
         }
 
@@ -109,7 +126,21 @@ fun AppNavHost(
         }
 
         composable(Rutas.ESCANER) {
-            EscanerQrPlaceholderScreen(onVolver = { navController.popBackStack() })
+            QrScannerScreen(
+                // Operario: el QR abre directo el formulario de movimiento del silo
+                onCodigoEscaneado = { codigo ->
+                    scope.launch {
+                        if (viewModel.existeSilo(codigo)) {
+                            navController.navigate(Rutas.movimiento(codigo)) {
+                                popUpTo(Rutas.ESCANER) { inclusive = true }
+                            }
+                        } else {
+                            navController.popBackStack()
+                        }
+                    }
+                },
+                onVolver = { navController.popBackStack() },
+            )
         }
     }
 }

@@ -6,10 +6,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.silomonitorapp.data.local.AppDatabase
-import com.example.silomonitorapp.data.local.SiloEntity
 import com.example.silomonitorapp.data.local.SiloRepository
 import com.example.silomonitorapp.ui.model.SiloUi
-import kotlinx.coroutines.Dispatchers
+import com.example.silomonitorapp.ui.model.TipoMovimiento
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,7 +20,6 @@ import kotlinx.coroutines.launch
 class SiloViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: SiloRepository
-    val silos: StateFlow<List<SiloEntity>>
 
     // Mapeo reactivo directo de Room a SiloUi
     val silosUi: StateFlow<List<SiloUi>>
@@ -29,18 +27,9 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
     private val _mensajeOperacion = MutableStateFlow<String?>(null)
     val mensajeOperacion: StateFlow<String?> = _mensajeOperacion.asStateFlow()
 
-    private val _siloSeleccionado = MutableStateFlow<SiloEntity?>(null)
-    val siloSeleccionado: StateFlow<SiloEntity?> = _siloSeleccionado.asStateFlow()
-
     init {
         val db = AppDatabase.obtenerBaseDatos(application)
         repository = SiloRepository(db.siloDao())
-
-        silos = repository.silosFlow.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
 
         // Convierte cada SiloEntity de Room a SiloUi en tiempo real
         silosUi = repository.silosFlow.map { lista ->
@@ -64,43 +53,37 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = emptyList()
         )
 
-        // Precarga en segundo plano seguro usando Dispatchers.IO
-        viewModelScope.launch(Dispatchers.IO) {
+        // Precarga de datos semilla (el repositorio ya trabaja en Dispatchers.IO)
+        viewModelScope.launch {
             try {
-                if (repository.obtenerSiloPorId("SIL-001") == null) {
-                    repository.precargarSilosSiEstaVacio()
-                }
+                repository.precargarSilosSiEstaVacio()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
-    fun seleccionarSilo(silo: SiloEntity?) {
-        _siloSeleccionado.value = silo
+    /** Indica si el código leído (QR o manual) corresponde a un silo registrado. */
+    suspend fun existeSilo(codigo: String): Boolean {
+        val existe = repository.obtenerSiloPorId(codigo) != null
+        if (!existe) _mensajeOperacion.value = "Código inválido o silo no registrado ($codigo)"
+        return existe
     }
 
-    fun seleccionarSiloPorId(id: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val silo = repository.obtenerSiloPorId(id)
-            if (silo != null) {
-                _siloSeleccionado.value = silo
-            } else {
-                _mensajeOperacion.value = "Código inválido o silo no registrado ($id)"
-            }
-        }
-    }
-
-    fun registrarMovimiento(idSilo: String, cantidadKg: Double, esCarga: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val resultado = repository.registrarMovimiento(idSilo, cantidadKg, esCarga)
-            resultado.onSuccess {
+    /**
+     * Aplica las reglas de terreno (sobrellenado y saldo negativo) y guarda el movimiento.
+     * Devuelve el mensaje de error para mostrarlo en el formulario, o null si se registró.
+     */
+    suspend fun registrarMovimiento(idSilo: String, tipo: TipoMovimiento, cantidadKg: Double): String? {
+        val esCarga = tipo == TipoMovimiento.CARGA
+        val resultado = repository.registrarMovimiento(idSilo, cantidadKg, esCarga)
+        return resultado.fold(
+            onSuccess = {
                 _mensajeOperacion.value = if (esCarga) "Carga registrada con éxito" else "Consumo registrado con éxito"
-                _siloSeleccionado.value = null
-            }.onFailure { error ->
-                _mensajeOperacion.value = error.message
-            }
-        }
+                null
+            },
+            onFailure = { error -> error.message ?: "No se pudo registrar el movimiento" }
+        )
     }
 
     fun limpiarMensaje() {
