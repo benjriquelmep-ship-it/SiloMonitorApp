@@ -18,9 +18,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SiloMonitorApp">
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}" />
+            android:value="AIzaSyBbf8wWxBI1M_dbI_uGyhqUnfCjViZVHqo" />
 
         <activity
             android:name=".MainActivity"
