@@ -1,6 +1,11 @@
 package com.example.silomonitorapp.ui.navigation
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope.SlideDirection
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -9,15 +14,18 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.silomonitorapp.ui.components.crearUriFotoEvidencia
 import com.example.silomonitorapp.ui.screens.MapaSilosScreen
 import com.example.silomonitorapp.ui.screens.MovimientoFormScreen
 import com.example.silomonitorapp.ui.screens.QrScannerScreen
@@ -81,11 +89,13 @@ fun AppNavHost(
             arguments = listOf(navArgument(Rutas.ARG_SILO_ID) { type = NavType.StringType }),
         ) { entrada ->
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
+            val movimientos by remember(id) { viewModel.historial(id) }.collectAsState(initial = emptyList())
             SiloDetailScreen(
                 silo = silos.firstOrNull { it.id == id },
                 onVolver = { navController.popBackStack() },
                 onRegistrarMovimiento = { navController.navigate(Rutas.movimiento(it.id)) },
                 onVerEnMapa = { navController.navigate(Rutas.mapa(it.id)) },
+                movimientos = movimientos,
             )
         }
 
@@ -95,17 +105,40 @@ fun AppNavHost(
         ) { entrada ->
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             var error by remember { mutableStateOf<String?>(null) }
+
+            // Foto de evidencia: la cámara del sistema la guarda en el archivo que le entregamos
+            var fotoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+            var uriEnCaptura by rememberSaveable { mutableStateOf<Uri?>(null) }
+            val tomarFoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { guardada ->
+                if (guardada) fotoUri = uriEnCaptura
+            }
+            fun abrirCamara() {
+                crearUriFotoEvidencia(context).also {
+                    uriEnCaptura = it
+                    tomarFoto.launch(it)
+                }
+            }
+            val pedirPermisoCamara = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
+                if (concedido) abrirCamara()
+                else Toast.makeText(context, "Se necesita la cámara para adjuntar la foto", Toast.LENGTH_LONG).show()
+            }
+
             MovimientoFormScreen(
                 silo = silos.firstOrNull { it.id == id },
                 error = error,
                 onVolver = { navController.popBackStack() },
-                onGuardar = { tipo, kg, _ ->
+                onGuardar = { tipo, kg, observacion ->
                     scope.launch {
-                        error = viewModel.registrarMovimiento(id, tipo, kg)
+                        error = viewModel.registrarMovimiento(id, tipo, kg, observacion, fotoUri?.toString())
                         if (error == null) navController.popBackStack()
                     }
                 },
-                onAdjuntarFoto = { /* TODO: cámara de evidencia */ },
+                onAdjuntarFoto = {
+                    val tienePermiso = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                        PackageManager.PERMISSION_GRANTED
+                    if (tienePermiso) abrirCamara() else pedirPermisoCamara.launch(Manifest.permission.CAMERA)
+                },
+                fotoUri = fotoUri,
             )
         }
 

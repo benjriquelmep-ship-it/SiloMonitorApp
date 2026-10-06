@@ -1,5 +1,6 @@
 package com.example.silomonitorapp.ui.screens
 
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,6 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.silomonitorapp.ui.components.AriztiaTopBar
 import com.example.silomonitorapp.ui.components.BarraNivelAnimada
+import com.example.silomonitorapp.ui.components.MiniaturaFoto
 import com.example.silomonitorapp.ui.components.formatearKg
 import com.example.silomonitorapp.ui.model.SiloUi
 import com.example.silomonitorapp.ui.model.TipoMovimiento
@@ -57,6 +59,7 @@ fun MovimientoFormScreen(
     onVolver: () -> Unit,
     onGuardar: (tipo: TipoMovimiento, kg: Double, observacion: String) -> Unit,
     onAdjuntarFoto: () -> Unit,
+    fotoUri: Uri? = null,
 ) {
     var tipo by rememberSaveable { mutableStateOf(TipoMovimiento.CARGA) }
     var kgTexto by rememberSaveable { mutableStateOf("") }
@@ -137,8 +140,10 @@ fun MovimientoFormScreen(
             ) {
                 Icon(Icons.Filled.PhotoCamera, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text("Adjuntar foto de evidencia")
+                Text(if (fotoUri == null) "Adjuntar foto de evidencia" else "Cambiar foto de evidencia")
             }
+
+            fotoUri?.let { MiniaturaFoto(it) }
 
             AnimatedVisibility(visible = error != null) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f))) {
