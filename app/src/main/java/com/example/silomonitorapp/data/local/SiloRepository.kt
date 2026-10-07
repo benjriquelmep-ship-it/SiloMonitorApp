@@ -49,6 +49,26 @@ class SiloRepository(private val db: AppDatabase) {
         Result.success(silo.copy(nivelActual = nuevoNivel))
     }
 
+    // Alta manual de un silo nuevo (respaldo ante fallas del QR y alta de infraestructura)
+    suspend fun crearSilo(silo: SiloEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        if (siloDao.obtenerSiloPorId(silo.id) != null) {
+            return@withContext Result.failure(Exception("Ya existe un silo con el código ${silo.id}."))
+        }
+        siloDao.insertarSilo(silo)
+        Result.success(Unit)
+    }
+
+    // Edita los datos maestros; el stock se conserva porque solo cambia con movimientos
+    suspend fun editarSilo(silo: SiloEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        val actual = siloDao.obtenerSiloPorId(silo.id)
+            ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
+        if (actual.nivelActual > silo.capacidadMaxima) {
+            return@withContext Result.failure(Exception("La capacidad no puede ser menor al stock actual (${actual.nivelActual.toInt()} kg)."))
+        }
+        siloDao.actualizarSilo(silo.copy(nivelActual = actual.nivelActual))
+        Result.success(Unit)
+    }
+
     // Datos semilla iniciales coincidentes con la UI de Ariztía (cada silo con su propia ubicación)
     suspend fun precargarSilosSiEstaVacio() = withContext(Dispatchers.IO) {
         if (siloDao.contarSilos() > 0) return@withContext

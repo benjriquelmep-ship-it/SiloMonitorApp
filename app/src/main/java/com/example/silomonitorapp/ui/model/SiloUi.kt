@@ -50,6 +50,20 @@ enum class TipoMovimiento(val etiqueta: String) {
     CONSUMO("Consumo"),
 }
 
+/** Datos del formulario de alta / edición de silos. */
+data class DatosSilo(
+    val codigo: String,
+    val nombre: String,
+    val granja: String,
+    val galpon: String,
+    val tipoAlimento: String,
+    val capacidadMaxKg: Double,
+    val stockActualKg: Double,
+    val consumoPromedioDiarioKg: Double,
+    val latitud: Double,
+    val longitud: Double,
+)
+
 /** Fila del historial de movimientos que se muestra en la ficha del silo. */
 data class MovimientoUi(
     val id: Long,

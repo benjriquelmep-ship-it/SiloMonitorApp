@@ -6,8 +6,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.silomonitorapp.data.local.AppDatabase
+import com.example.silomonitorapp.data.local.SiloEntity
 import com.example.silomonitorapp.data.local.SiloRepository
+import com.example.silomonitorapp.domain.ReglasTerreno
 import com.example.silomonitorapp.notificaciones.NotificadorAlertas
+import com.example.silomonitorapp.ui.model.DatosSilo
 import com.example.silomonitorapp.ui.model.EstadoSilo
 import com.example.silomonitorapp.ui.model.MovimientoUi
 import com.example.silomonitorapp.ui.model.SiloUi
@@ -88,6 +91,56 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
         val existe = repository.obtenerSiloPorId(codigo) != null
         if (!existe) _mensajeOperacion.value = "Código inválido o silo no registrado ($codigo)"
         return existe
+    }
+
+    /** Datos actuales del silo para precargar el formulario de edición. */
+    suspend fun obtenerDatosSilo(id: String): DatosSilo? =
+        repository.obtenerSiloPorId(id)?.let { e ->
+            DatosSilo(
+                codigo = e.id,
+                nombre = e.nombre,
+                granja = e.granja,
+                galpon = e.galpon,
+                tipoAlimento = e.tipoAlimento,
+                capacidadMaxKg = e.capacidadMaxima,
+                stockActualKg = e.nivelActual,
+                consumoPromedioDiarioKg = e.consumoPromedioDiario,
+                latitud = e.latitud,
+                longitud = e.longitud
+            )
+        }
+
+    /**
+     * Valida y guarda un silo nuevo o editado.
+     * Devuelve el mensaje de error para mostrarlo en el formulario, o null si se guardó.
+     */
+    suspend fun guardarSilo(datos: DatosSilo, esNuevo: Boolean): String? {
+        val codigo = datos.codigo.trim().uppercase()
+        ReglasTerreno.validarSilo(
+            codigo, datos.nombre, datos.granja, datos.capacidadMaxKg,
+            datos.stockActualKg, datos.consumoPromedioDiarioKg, datos.latitud, datos.longitud
+        )?.let { return it }
+
+        val entidad = SiloEntity(
+            id = codigo,
+            nombre = datos.nombre.trim(),
+            granja = datos.granja.trim(),
+            galpon = datos.galpon.trim(),
+            tipoAlimento = datos.tipoAlimento.trim(),
+            capacidadMaxima = datos.capacidadMaxKg,
+            nivelActual = datos.stockActualKg,
+            consumoPromedioDiario = datos.consumoPromedioDiarioKg,
+            latitud = datos.latitud,
+            longitud = datos.longitud
+        )
+        val resultado = if (esNuevo) repository.crearSilo(entidad) else repository.editarSilo(entidad)
+        return resultado.fold(
+            onSuccess = {
+                _mensajeOperacion.value = if (esNuevo) "Silo $codigo creado" else "Silo $codigo actualizado"
+                null
+            },
+            onFailure = { error -> error.message ?: "No se pudo guardar el silo" }
+        )
     }
 
     /**

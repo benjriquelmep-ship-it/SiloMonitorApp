@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -20,6 +21,13 @@ interface SiloDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insertarOActualizarSilos(silos: List<SiloEntity>): List<Long>
+
+    // ABORT: falla si el código ya existe, para no sobrescribir un silo (ni su historial)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    fun insertarSilo(silo: SiloEntity): Long
+
+    @Update
+    fun actualizarSilo(silo: SiloEntity): Int
 
     @Query("UPDATE silos SET nivelActual = :nuevoNivel WHERE id = :id")
     fun actualizarNivel(id: String, nuevoNivel: Double): Int
