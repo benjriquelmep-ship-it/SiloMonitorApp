@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
@@ -58,7 +59,8 @@ fun SiloListScreen(
             busqueda.isBlank() ||
                 it.nombre.contains(busqueda, ignoreCase = true) ||
                 it.codigo.contains(busqueda, ignoreCase = true) ||
-                it.granja.contains(busqueda, ignoreCase = true)
+                it.granja.contains(busqueda, ignoreCase = true) ||
+                it.galpon.contains(busqueda, ignoreCase = true)
         }
         // Los críticos primero, luego por menor nivel
         .sortedWith(compareByDescending<SiloUi> { it.estado.ordinal }.thenBy { it.porcentaje })
@@ -102,8 +104,15 @@ fun SiloListScreen(
                     value = busqueda,
                     onValueChange = { busqueda = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Buscar por nombre, código o granja") },
+                    placeholder = { Text("Buscar por nombre, código, granja o galpón") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (busqueda.isNotEmpty()) {
+                            IconButton(onClick = { busqueda = "" }) {
+                                Icon(Icons.Filled.Clear, contentDescription = "Limpiar búsqueda")
+                            }
+                        }
+                    },
                     singleLine = true,
                     shape = MaterialTheme.shapes.medium,
                 )
