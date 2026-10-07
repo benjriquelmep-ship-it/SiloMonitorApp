@@ -1,113 +1,136 @@
 # SiloMonitorApp 🌾🚜
 
-**SiloMonitorApp** es una solución móvil nativa para Android desarrollada en Kotlin y Jetpack Compose, diseñada para el monitoreo georreferenciado, control de inventario y trazabilidad de alimento en tolvas y silos agroindustriales (caso de estudio Ariztía). Su objetivo es mitigar riesgos de desabastecimiento en galpones y optimizar la cadena logística de reposición en terreno mediante una arquitectura robusta *offline-first*.
+**SiloMonitorApp** es una plataforma móvil nativa para Android desarrollada en Kotlin y Jetpack Compose, concebida para el monitoreo georreferenciado, la trazabilidad operacional y la optimización de la reposición de alimento en tolvas y silos agroindustriales (caso de estudio **Empresas Ariztía**).
+
+El sistema resuelve la problemática de quiebres de inventario no advertidos y contingencias logísticas en galpones avícolas mediante una arquitectura reactiva **Offline-First**: las transacciones de faena se procesan, validan y almacenan de forma local en el dispositivo, sincronizándose con la nube una vez restablecida la conectividad.
+
+> Proyecto desarrollado para la asignatura **Desarrollo de Aplicaciones Móviles (DSY1105)** — Escuela de Informática y Telecomunicaciones, **Duoc UC**.
 
 ---
 
-## 👥 Información del Proyecto y Equipo
+## 👥 Equipo y Datos Académicos
 
-- **Institución:** Duoc UC
-- **Asignatura:** Desarrollo de Aplicaciones Móviles (DSY1105)
-- **Integrantes:**
-    - Benjamín Alexis Riquelme Pozo
-    - [Nombre y Apellido de tu compañero/a]
-- **Docente:** [Nombre del Docente]
-- **Planificación del Proyecto:** [Enlace al tablero de Trello]
+* **Institución Educativa:** Duoc UC
+* **Asignatura:** Desarrollo de Aplicaciones Móviles (`DSY1105`)
+* **Integrantes:**
+  * **Benjamín Alexis Riquelme Pozo**
+  * **Aileen Oyaneder**
 
 ---
 
-## 📌 Características Principales
+## 🎯 Problemática y Propuesta de Valor
 
-- **Monitoreo en Tiempo Real y Semáforo de Capacidad:**
-    - Semáforo visual automatizado por umbrales de stock:
-        - 🟢 **Normal (> 40%):** Abastecimiento óptimo (`#2E7D32`).
-        - 🟡 **Advertencia (20% – 40%):** Reposición recomendada para prevenir quiebres (`#F57F17`).
-        - 🔴 **Crítico (< 20%):** Alerta prioritaria de desabastecimiento inminente (`#C62828`).
-- **Estimación Predictiva de Autonomía:**
-    - Proyección en tiempo real de las horas de alimento restantes basada en la media móvil de consumo de los últimos 3 a 7 días en el galpón asociado:
-      > **Horas de Autonomía = (Stock Actual en kg / Consumo Promedio Diario en kg) × 24 horas**
-- **Acceso Dual a Silos (QR + Ingreso Manual):**
-    - Identificación instantánea mediante escáner de códigos QR usando ML Kit.
-    - Flujo de contingencia (*fallback*) para búsqueda, selección y registro manual en caso de etiquetas dañadas o fallas de lectura en terreno.
-- **Validaciones Anti-Error en Terreno (Desacopladas en Dominio/ViewModel):**
-    - *Bloqueo de sobrellenado:* Impide registrar cargas si **(Stock Actual + Carga) > Capacidad Máxima** del silo.
-    - *Prevención de saldo negativo:* Bloquea transacciones de consumo superiores al stock real disponible (**Consumo ≤ Stock Actual**).
-    - Retroalimentación visual inmediata con mensajes de error tipificados e íconos en cada campo de formulario.
-- **Captura de Evidencia Fotográfica:**
-    - Registro de anomalías físicas, daños estructurales o auditorías de carga capturando fotografías en faena con la cámara nativa mediante `FileProvider` y renderizado inmediato en la interfaz.
-- **Cartografía y Georreferenciación Interactiva:**
-    - Visualización espacial de silos y sectores con **Google Maps SDK**, con pines dinámicos coloreados según el semáforo y tarjetas desplegables (*ModalBottomSheet*) para consultar la ficha técnica y coordinar camiones.
-- **Exportación de Reportes Nativos (Auditoría):**
-    - Generación de planillas de inventario en formato **CSV** delimitado por punto y coma (compatible con Microsoft Excel).
-    - Creación de informes ejecutivos en formato **PDF** con membrete oficial institucional y estados coloreados mediante `PdfDocument` nativo de Android y `Android Sharesheet`.
-- **Control de Acceso Basado en Roles (RBAC):**
-    - **Operario:** Registro de transacciones locales, escaneo QR/manual y visualización de su granja asignada.
-    - **Supervisor:** Auditoría de movimientos, visualización de incidencias zonales y solicitud de camiones de reposición.
-    - **Jefatura:** Mapa macro de todas las plantas, planificación logística y dashboard de analítica histórica.
-    - **Administrador (ADMIN):** Alta manual de silos con captura GPS, generación de QR, CRUD de infraestructura y usuarios.
-- **Alertas y Auditoría Periódica:**
-    - Monitoreo en segundo plano con **WorkManager** para evaluar niveles críticos (< 20%) y emitir notificaciones locales al dispositivo.
+En faenas de crianza y engorde avícola distribuidas geográficamente, el agotamiento de tolvas y silos compromete los ciclos productivos. Los registros en papel o dependientes de cobertura satelital/móvil fallan debido al aislamiento habitual de los planteles.
+
+**SiloMonitorApp** entrega:
+1. **Continuidad Operacional Total:** Registro ininterrumpido de cargas y consumos sin conexión a internet mediante base de datos SQLite/Room embebida.
+2. **Defensa Anti-Error en Faena:** Reglas matemáticas de validación desacopladas que impiden registrar sobrellenados o saldos negativos en silos.
+3. **Visibilidad Ejecutiva e Instantánea:** Semáforos visuales basados en niveles de capacidad, cálculo dinámico de autonomía en horas y exportación de auditorías en PDF y CSV.
+4. **Trazabilidad con Evidencia:** Registro visual de guías de despacho, sellos o anomalías estructurales mediante la cámara nativa.
 
 ---
 
-## 🔐 Usuarios de Demostración (RBAC)
+## 📌 Funcionalidades Principales
 
-Credenciales preconfiguradas para pruebas locales (definidas en `data/sesion/UsuariosDemo.kt` con hashing SHA-256):
+### 1. Monitoreo y Semáforo de Capacidad Automatizado
+* **Cálculo reactivo de capacidad:** Actualización en tiempo real del porcentaje de ocupación a partir del stock en kilogramos y la capacidad máxima declarada.
+* **Semáforo tricolor normado:**
+  * 🟢 **Óptimo (> 40%):** Nivel suficiente de alimento (`#2E7D32`).
+  * 🟠 **Advertencia (20% – 40%):** Nivel bajo; reposición sugerida para evitar contingencias (`#F57F17`).
+  * 🔴 **Crítico (< 20%):** Alerta prioritaria; riesgo inminente de desabastecimiento (`#C62828`).
+* **Buscador y filtros:** Filtrado simultáneo por estado de riesgo y coincidencia de texto (nombre de silo, código, granja o galpón).
 
-| Usuario | Contraseña | Rol | Alcance Asignado |
-|---|---|---|---|
+### 2. Proyección Predictiva de Autonomía
+* Algoritmo de cálculo en el dispositivo para estimar las horas operacionales restantes antes del quiebre:
+  $$\text{Horas de Autonomía} = \left(\frac{\text{Stock Actual (kg)}}{\text{Consumo Promedio Diario (kg)}}\right) \times 24\,\text{horas}$$
+* Visibilidad directa en las tarjetas resumen de la lista principal y en el encabezado de la ficha técnica.
+
+### 3. Registro de Cargas/Consumos con Validaciones Centralizadas
+* Formulario interactivo con retroalimentación visual, badges contextuales y soporte de errores por campo:
+  * **Bloqueo estricto de sobrellenado:** Se rechaza la carga si $(\text{Stock Actual} + \text{Kilos Carga}) > \text{Capacidad Máxima}$.
+  * **Prevención de saldo negativo:** Se rechaza el egreso si $\text{Kilos Consumo} > \text{Stock Actual}$.
+  * **Obligatoriedad de campos:** Validación de rango numérico positivo y longitud mínima en observaciones.
+* **Evidencia Fotográfica:** Activación de cámara fotográfica del sistema para adjuntar pruebas visuales a la transacción.
+
+### 4. Acceso Dual: Escáner QR y Contingencia Manual
+* **Identificación Rápida por QR:** Integración con Google ML Kit Barcode Scanning para leer etiquetas en la base del silo y saltar inmediatamente a la pantalla operativa según el perfil del usuario.
+* **Flujo de Contingencia:** Selector manual optimizado con búsqueda rápida para faenas donde el código QR se encuentre desgastado, sucio o inaccesible.
+
+### 5. Cartografía y Georreferenciación Interactiva
+* Visualización en **Google Maps Compose SDK** con marcadores teñidos dinámicamente según el semáforo de capacidad.
+* Centrado de mapa mediante proveedor de ubicación GPS nativo (`FusedLocationProviderClient`).
+* Ficha técnica desplegable mediante componente *ModalBottomSheet* para consultar detalles y gestionar pedidos sin abandonar el mapa.
+
+### 6. Logística de Camiones y Flujo de Reposición
+* **Solicitud (Supervisor/Admin):** Emisión de solicitudes de reposición desde la ficha del silo, sugiriendo automáticamente los kilos faltantes para el llenado y marcando prioridad urgente en silos críticos.
+* **Aprobación (Jefatura/Admin):** Bandeja unificada con acciones para autorizar o denegar despachos, bloqueando solicitudes duplicadas o solicitudes con volumen mayor a la capacidad libre.
+
+### 7. Dashboard Analítico y Reportabilidad Ejecutiva
+* Tarjetas de resumen: llenado global consolidado, conteo de silos en condición crítica, silo con menor autonomía y solicitudes pendientes.
+* Gráfico de barras interactivo con el consumo de los últimos 7 días.
+* **Exportación de Documentos Formales:**
+  * **Planilla CSV:** Datos tabulados delimitados por punto y coma (`;`), optimizados para análisis en Microsoft Excel.
+  * **Informe Oficial PDF:** Generación en memoria en tamaño A4 con membrete institucional, tablas y colores semafóricos mediante `PdfDocument` de Android.
+  * Distribución mediante el menú del sistema operativo (**Android Sharesheet**) a través de `FileProvider`.
+
+### 8. Notificaciones de Emergencia en Terreno
+* Disparo de notificaciones nativas locales del sistema al registrar una transacción que reduzca el stock de un silo a menos del 20%, con navegación directa hacia el detalle del silo.
+
+---
+
+## 🔐 Control de Acceso Basado en Roles (RBAC)
+
+La aplicación implementa un esquema de control de accesos centralizado en `domain/Roles.kt`, donde las pantallas y acciones evalúan permisos específicos (`puedeRegistrarMovimientos`, `puedeSolicitarCamion`, `puedeAprobarCamion`, etc.):
+
+| Funcionalidad / Módulo | Operario | Supervisor | Jefatura | Administrador |
+|:---|:---:|:---:|:---:|:---:|
+| **Visibilidad de Silos** | Granja asignada | Granjas de su zona | Todas las granjas | Todas las granjas |
+| **Registrar Carga / Consumo** | ✅ | ❌ | ❌ | ✅ |
+| **Acción tras Escanear QR** | Formulario directo | Ficha técnica | Ficha técnica | Ficha técnica |
+| **Solicitar Camión de Alimento** | ❌ | ✅ | ❌ | ✅ |
+| **Aprobar / Rechazar Camiones** | ❌ | ❌ | ✅ | ✅ |
+| **Bandeja de Reposición** | ❌ | ✅ *(Lectura)* | ✅ *(Gestión)* | ✅ *(Gestión)* |
+| **Dashboard y Reportes (CSV/PDF)** | ❌ | ❌ | ✅ | ✅ |
+| **Crear / Editar Silos con GPS** | ❌ | ❌ | ❌ | ✅ |
+
+### Cuentas de Acceso de Demostración (`data/sesion/UsuariosDemo.kt`)
+
+Las credenciales locales están aseguradas con cifrado de contraseñas mediante hash SHA-256:
+
+| Usuario | Contraseña | Rol Asignado | Alcance Geográfico |
+|:---|:---|:---|:---|
 | `operario` | `Operario2026!` | Operario | Granja El Paico |
 | `supervisor` | `Supervisor2026!` | Supervisor | Granja El Paico y Granja Pomaire |
-| `jefatura` | `Jefatura2026!` | Jefatura | Todas las granjas |
-| `admin` | `Admin2026!` | Administrador | Todas las granjas |
+| `jefatura` | `Jefatura2026!` | Jefatura | Global (Todas las granjas) |
+| `admin` | `Admin2026!` | Administrador | Global (Acceso total) |
 
 ---
 
 ## 🏗 Arquitectura del Software
 
-El proyecto sigue una arquitectura **MVVM (Model-View-ViewModel)** bajo un enfoque **Offline-First**, separando estrictamente responsabilidades:
+El proyecto se fundamenta en los patrones **MVVM (Model-View-ViewModel)** y **Repository**, desacoplando la lógica de negocio pura del framework de Android y garantizando una arquitectura **Offline-First**:
 
-1. **Capa de Presentación (UI):** Desarrollada 100% en Jetpack Compose, basada en componentes reutilizables, animaciones reactivas (`animateFloatAsState`, `animateItem`) y consumo de estado unidireccional vía `StateFlow`.
-2. **Capa de Dominio (Domain):** Encapsula modelos de negocio, reglas de validación en terreno desacopladas de la interfaz y casos de uso de estimación de consumo.
-3. **Capa de Datos (Data):**
-    - **Persistencia Local (Room SQLite):** Base de datos `AppDatabase` con DAOs y entidades (`SiloEntity`, `MovimientoEntity`, `SolicitudCamionEntity`) como fuente única de verdad en el dispositivo.
-    - **Capa Remota (Firebase Cloud Firestore):** Sincronización asíncrona de movimientos y solicitudes mediante `SyncRepository` cuando el dispositivo detecta conexión a internet.
-    - **Módulo de Reportes:** `ReporteHelper` para la generación y distribución de archivos en caché segura con `FileProvider`.
-
----
-
-## 📱 Recursos Nativos del Dispositivo y Permisos
-
-Para cumplir con las exigencias de integración de hardware nativo de Android, la aplicación implementa y gestiona los siguientes permisos:
-
-1. **Cámara Nativa (`android.permission.CAMERA`):**
-    - Utilizada para la captura de fotos de evidencia y el escaneo de códigos QR mediante Google ML Kit.
-2. **Almacenamiento Seguro (`androidx.core.content.FileProvider`):**
-    - Manejo de URIs seguras (`content://`) para almacenar fotos de auditoría en la memoria privada de la aplicación y compartir reportes CSV/PDF sin exponer rutas absolutas del sistema.
-3. **Geolocalización (`ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`):**
-    - Captura precisa de coordenadas geográficas en faena para la asignación de silos y renderizado en Google Maps.
-4. **Notificaciones (`android.permission.POST_NOTIFICATIONS`):**
-    - Emisión de alertas locales al operario ante quiebres de stock inminentes.
-
----
-
-## 🛠️ Stack Tecnológico
-
-- **Lenguaje:** Kotlin
-- **UI Toolkit:** Jetpack Compose & Material 3
-- **Arquitectura:** MVVM + Clean Architecture Principles
-- **Persistencia Local:** Android Jetpack Room (SQLite)
-- **Persistencia Cloud:** Firebase Cloud Firestore
-- **Procesamiento de Imágenes / QR:** Google ML Kit Barcode Scanning
-- **Mapas:** Google Maps Compose SDK & Play Services Location
-- **Concurrencia:** Kotlin Coroutines & StateFlow
-- **Generación Documental:** Android `PdfDocument` & Java I/O (CSV)
-- **Min SDK:** 24 (Android 7.0 Nougat) | **Target SDK:** 34 o superior
-
----
-
-## 🚀 Pasos para Clonar y Ejecutar el Proyecto
-
-1. **Clonar el repositorio:**
-   ```bash
-   git clone [https://github.com/benjriquelmep-ship-it/SiloMonitorApp.git](https://github.com/benjriquelmep-ship-it/SiloMonitorApp.git)
+```text
+┌────────────────────────────────────────────────────────┐
+│               CAPA DE PRESENTACIÓN (UI)                │
+│    Jetpack Compose | Navigation | Componentes M3       │
+└───────────────────────────▲────────────────────────────┘
+                            │ Estado (StateFlow) / Eventos
+┌───────────────────────────┴────────────────────────────┐
+│                    CAPA VIEWMODEL                      │
+│     SiloViewModel  |  SesionViewModel (Coroutines)     │
+└─────────────┬────────────────────────────┬─────────────┘
+              │ Consulta reglas puras      │ Lectura/Escritura
+┌─────────────▼───────────────┐ ┌──────────▼─────────────┐
+│       CAPA DE DOMINIO       │ │     CAPA DE DATOS      │
+│   ReglasTerreno (Validación)│ │   SiloRepositoryImpl   │
+│   Roles (Matriz permisos)   │ └──────────┬─────────────┘
+└─────────────────────────────┘            │
+                   ┌───────────────────────┴───────────────────────┐
+                   │                                               │
+       ┌───────────▼───────────┐                       ┌───────────▼───────────┐
+       │   PERSISTENCIA ROOM   │                       │   FIREBASE FIRESTORE  │
+       │    (Fuente de Verdad) │                       │ (Sincronización Cloud)│
+       │  Silos, Movimientos,  │                       │  Colas y transacciones│
+       │       Solicitudes     │                       │     asíncronas        │
+       └───────────────────────┘                       └───────────────────────┘

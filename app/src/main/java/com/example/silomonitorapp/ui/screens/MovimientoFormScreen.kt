@@ -2,6 +2,8 @@ package com.example.silomonitorapp.ui.screens
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
@@ -48,16 +51,15 @@ import com.example.silomonitorapp.ui.model.silosDemo
 import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 
 /**
- * Campos visuales del formulario de Carga / Consumo.
- * Las reglas de validación (sobrellenado y saldo negativo) viven en el ViewModel:
- * esta pantalla solo muestra el [error] que se le entregue.
+ * Pantalla de registro de movimientos (Carga / Consumo).
+ * Cumple con validaciones desacopladas, retroalimentación visual por campo e iconos.
  */
 @Composable
 fun MovimientoFormScreen(
     silo: SiloUi?,
     error: String?,
     onVolver: () -> Unit,
-    onGuardar: (tipo: TipoMovimiento, kg: Double, observacion: String) -> Unit,
+    onGuardar: (tipo: TipoMovimiento, kg: Double, observacion: String, fotoUri: Uri?) -> Unit,
     onAdjuntarFoto: () -> Unit,
     fotoUri: Uri? = null,
 ) {
@@ -113,6 +115,7 @@ fun MovimientoFormScreen(
                 }
             }
 
+            // Campo de Cantidad con icono de error y supportingText explícito
             OutlinedTextField(
                 value = kgTexto,
                 onValueChange = { kgTexto = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
@@ -120,6 +123,29 @@ fun MovimientoFormScreen(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 isError = error != null,
+                trailingIcon = {
+                    if (error != null) {
+                        Icon(
+                            imageVector = Icons.Filled.Error,
+                            contentDescription = "Error de validación",
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                },
+                supportingText = {
+                    if (error != null) {
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        Text(
+                            text = "Ingrese los kilos a ${tipo.etiqueta.lowercase()}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 shape = MaterialTheme.shapes.medium,
             )
@@ -143,10 +169,21 @@ fun MovimientoFormScreen(
                 Text(if (fotoUri == null) "Adjuntar foto de evidencia" else "Cambiar foto de evidencia")
             }
 
-            fotoUri?.let { MiniaturaFoto(it) }
+            // Muestra visual del recurso nativo en la interfaz
+            fotoUri?.let { uri ->
+                MiniaturaFoto(uri)
+            }
 
-            AnimatedVisibility(visible = error != null) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f))) {
+            // Tarjeta de alerta animada ante error general
+            AnimatedVisibility(
+                visible = error != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.12f)),
+                    shape = MaterialTheme.shapes.medium,
+                ) {
                     Text(
                         error.orEmpty(),
                         modifier = Modifier.padding(16.dp),
@@ -157,7 +194,7 @@ fun MovimientoFormScreen(
             }
 
             Button(
-                onClick = { kg?.let { onGuardar(tipo, it, observacion.trim()) } },
+                onClick = { kg?.let { onGuardar(tipo, it, observacion.trim(), fotoUri) } },
                 enabled = kg != null && kg > 0,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = MaterialTheme.shapes.medium,
@@ -178,7 +215,7 @@ private fun MovimientoFormScreenPreview() {
             silo = silosDemo[0],
             error = null,
             onVolver = {},
-            onGuardar = { _, _, _ -> },
+            onGuardar = { _, _, _, _ -> },
             onAdjuntarFoto = {},
         )
     }
