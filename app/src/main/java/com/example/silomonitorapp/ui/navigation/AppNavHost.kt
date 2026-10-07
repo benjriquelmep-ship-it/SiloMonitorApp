@@ -29,6 +29,7 @@ import com.example.silomonitorapp.ui.components.crearUriFotoEvidencia
 import com.example.silomonitorapp.ui.screens.MapaSilosScreen
 import com.example.silomonitorapp.ui.screens.MovimientoFormScreen
 import com.example.silomonitorapp.ui.screens.QrScannerScreen
+import com.example.silomonitorapp.domain.Usuario
 import com.example.silomonitorapp.ui.model.DatosSilo
 import com.example.silomonitorapp.ui.screens.SiloDetailScreen
 import com.example.silomonitorapp.ui.screens.SiloFormScreen
@@ -58,6 +59,8 @@ private const val DURACION_TRANSICION_MS = 350
 @Composable
 fun AppNavHost(
     viewModel: SiloViewModel,
+    usuario: Usuario,
+    onCerrarSesion: () -> Unit,
     navController: NavHostController = rememberNavController(),
 ) {
     val context = LocalContext.current
@@ -87,6 +90,8 @@ fun AppNavHost(
                 onAbrirMapa = { navController.navigate(Rutas.mapa()) },
                 onEscanearQr = { navController.navigate(Rutas.ESCANER) },
                 onAgregarSilo = { navController.navigate(Rutas.formularioSilo()) },
+                usuario = usuario,
+                onCerrarSesion = onCerrarSesion,
             )
         }
 
