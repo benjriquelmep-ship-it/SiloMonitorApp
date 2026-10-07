@@ -1,5 +1,6 @@
 package com.example.silomonitorapp.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -82,14 +83,22 @@ fun DashboardScreen(
                 onVolver = onVolver,
                 acciones = {
                     IconButton(onClick = {
-                        val file = ReporteHelper.generarCsvInventario(context, silos)
-                        ReporteHelper.compartirArchivo(context, file, "text/csv")
+                        runCatching {
+                            val file = ReporteHelper.generarCsvInventario(context, silos)
+                            ReporteHelper.compartirArchivo(context, file, "text/csv")
+                        }.onFailure {
+                            Toast.makeText(context, "Error al generar CSV: ${it.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }) {
                         Icon(Icons.Filled.TableChart, contentDescription = "Exportar CSV")
                     }
                     IconButton(onClick = {
-                        val file = ReporteHelper.generarPdfInventario(context, silos)
-                        ReporteHelper.compartirArchivo(context, file, "application/pdf")
+                        runCatching {
+                            val file = ReporteHelper.generarPdfInventario(context, silos)
+                            ReporteHelper.compartirArchivo(context, file, "application/pdf")
+                        }.onFailure {
+                            Toast.makeText(context, "Error al generar PDF: ${it.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }) {
                         Icon(Icons.Filled.PictureAsPdf, contentDescription = "Exportar PDF")
                     }
