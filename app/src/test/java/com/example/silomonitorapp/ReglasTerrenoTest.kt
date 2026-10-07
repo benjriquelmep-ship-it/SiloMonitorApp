@@ -90,8 +90,17 @@ class ReglasTerrenoTest {
 
     @Test
     fun altaSilo_conCodigoMalFormado_esRechazada() {
-        assertTrue(validar(codigo = "silo7") != null)
-        assertTrue(validar(codigo = "SIL-7") != null)
+        assertTrue(validar(codigo = "") != null)
+        assertTrue(validar(codigo = "SIL 007") != null)
+        assertTrue(validar(codigo = "SILO#7") != null)
+        assertTrue(validar(codigo = "A".repeat(21)) != null)
+    }
+
+    @Test
+    fun altaSilo_aceptaCualquierCodigoConLetrasNumerosYGuiones() {
+        assertNull(validar(codigo = "SIL-007"))
+        assertNull(validar(codigo = "TOLVA-12"))
+        assertNull(validar(codigo = "A1"))
     }
 
     @Test

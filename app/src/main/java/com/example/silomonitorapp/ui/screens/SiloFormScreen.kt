@@ -147,12 +147,16 @@ fun SiloFormScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Seccion("Identificación")
-            CampoTexto(
-                valor = codigo,
-                onCambio = { codigo = it.uppercase() },
-                etiqueta = "Código (ej: SIL-007)",
-                habilitado = esNuevo,
-                mayusculas = true,
+            // Código libre, en mayúsculas y sin espacios: es el mismo texto que lleva el QR del silo
+            OutlinedTextField(
+                value = codigo,
+                onValueChange = { texto -> codigo = texto.uppercase().filter { it.isLetterOrDigit() || it == '-' }.take(20) },
+                label = { Text("Código del silo (ej: SIL-007)") },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = esNuevo,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                shape = MaterialTheme.shapes.medium,
             )
             CampoTexto(nombre, { nombre = it }, "Nombre del silo")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -247,19 +251,14 @@ private fun CampoTexto(
     onCambio: (String) -> Unit,
     etiqueta: String,
     modifier: Modifier = Modifier.fillMaxWidth(),
-    habilitado: Boolean = true,
-    mayusculas: Boolean = false,
 ) {
     OutlinedTextField(
         value = valor,
         onValueChange = onCambio,
         label = { Text(etiqueta) },
         modifier = modifier,
-        enabled = habilitado,
         singleLine = true,
-        keyboardOptions = KeyboardOptions(
-            capitalization = if (mayusculas) KeyboardCapitalization.Characters else KeyboardCapitalization.Sentences
-        ),
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         shape = MaterialTheme.shapes.medium,
     )
 }

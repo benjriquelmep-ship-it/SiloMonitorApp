@@ -50,7 +50,9 @@ object ReglasTerreno {
         latitud: Double,
         longitud: Double
     ): String? = when {
-        !Regex("^[A-Z]{3}-\\d{3,}$").matches(codigo) -> "El código debe tener el formato SIL-001."
+        codigo.isBlank() -> "El código del silo es obligatorio."
+        // Sin espacios ni símbolos: el mismo código va impreso en el QR del silo
+        !Regex("^[A-Z0-9-]{1,20}$").matches(codigo) -> "El código solo puede tener letras, números y guiones (máx. 20)."
         nombre.isBlank() -> "El nombre del silo es obligatorio."
         granja.isBlank() -> "La granja es obligatoria."
         capacidadMaxima <= 0 -> "La capacidad máxima debe ser mayor a 0 kg."
