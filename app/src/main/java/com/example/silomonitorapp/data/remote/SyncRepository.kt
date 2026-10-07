@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.silomonitorapp.data.local.AppDatabase
 import com.example.silomonitorapp.data.local.MovimientoEntity
 import com.example.silomonitorapp.data.local.SolicitudCamionEntity
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -16,15 +17,32 @@ data class SyncResult(
     val error: String? = null
 )
 
-class SyncRepository(context: Context) {
+class SyncRepository(private val context: Context) {
 
     private val db = AppDatabase.obtenerBaseDatos(context)
     private val movimientoDao = db.movimientoDao()
     private val solicitudDao = db.solicitudCamionDao()
-    private val firestore = FirebaseFirestore.getInstance()
+
+    // Obtiene Firestore solo si FirebaseApp fue inicializado, sin crashear la app
+    private fun obtenerFirestore(): FirebaseFirestore? {
+        return try {
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseApp.initializeApp(context)
+            }
+            FirebaseFirestore.getInstance()
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     suspend fun sincronizarTodo(): SyncResult = withContext(Dispatchers.IO) {
         try {
+            val firestore = obtenerFirestore()
+                ?: return@withContext SyncResult(
+                    exitoso = false,
+                    error = "Firebase no está inicializado o falta google-services.json"
+                )
+
             val movPendientes: List<MovimientoEntity> = movimientoDao.obtenerPendientesSincronizar()
             val solPendientes: List<SolicitudCamionEntity> = solicitudDao.obtenerPendientesSincronizar()
 
@@ -33,7 +51,7 @@ class SyncRepository(context: Context) {
             }
 
             val idsMovExitosos = mutableListOf<Long>()
-            for (mov in movPendientes) {
+            for (mov: MovimientoEntity in movPendientes) {
                 val data: Map<String, Any?> = mapOf(
                     "idLocal" to mov.id,
                     "siloId" to mov.siloId,
@@ -55,7 +73,7 @@ class SyncRepository(context: Context) {
             }
 
             val idsSolExitosos = mutableListOf<Long>()
-            for (sol in solPendientes) {
+            for (sol: SolicitudCamionEntity in solPendientes) {
                 val data: Map<String, Any?> = mapOf(
                     "idLocal" to sol.id,
                     "siloId" to sol.siloId,
