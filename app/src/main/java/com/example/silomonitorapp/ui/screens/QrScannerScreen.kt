@@ -12,12 +12,35 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +53,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 @Composable
 fun QrScannerScreen(
@@ -57,7 +81,6 @@ fun QrScannerScreen(
 
     Scaffold(
         topBar = {
-            // Barra superior roja Ariztía estándar sin dependencias experimentales
             Surface(
                 color = Color(0xFFD32F2F),
                 modifier = Modifier.fillMaxWidth()
@@ -101,7 +124,7 @@ fun QrScannerScreen(
                     }
                 )
 
-                // Marco guía para apuntar al QR
+                // Marco visual guía
                 Box(
                     modifier = Modifier
                         .size(260.dp)
@@ -149,7 +172,15 @@ fun CameraPreviewConMlKit(
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
     val barcodeScanner = remember { BarcodeScanning.getClient() }
-    var escaneadoCompletado by remember { mutableStateOf(false) }
+    val escaneadoCompletado = remember { AtomicBoolean(false) }
+
+    // Liberación estricta de hilos y clientes nativos al salir de la pantalla
+    DisposableEffect(Unit) {
+        onDispose {
+            barcodeScanner.close()
+            cameraExecutor.shutdown()
+        }
+    }
 
     AndroidView(
         factory = { ctx ->
@@ -168,16 +199,20 @@ fun CameraPreviewConMlKit(
 
                 imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
                     val mediaImage = imageProxy.image
-                    if (mediaImage != null && !escaneadoCompletado) {
+                    if (mediaImage != null && !escaneadoCompletado.get()) {
                         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
                         barcodeScanner.process(image)
                             .addOnSuccessListener { barcodes ->
                                 for (barcode in barcodes) {
                                     val valor = barcode.rawValue
-                                    if (!valor.isNullOrBlank() && !escaneadoCompletado) {
-                                        escaneadoCompletado = true
-                                        onQrDetectado(valor)
-                                        break
+                                    if (!valor.isNullOrBlank()) {
+                                        // compareAndSet asegura un solo disparo de navegación
+                                        if (escaneadoCompletado.compareAndSet(false, true)) {
+                                            ContextCompat.getMainExecutor(ctx).execute {
+                                                onQrDetectado(valor)
+                                            }
+                                            break
+                                        }
                                     }
                                 }
                             }
