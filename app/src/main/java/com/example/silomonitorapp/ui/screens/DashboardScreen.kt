@@ -14,9 +14,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -33,12 +38,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.silomonitorapp.data.reports.ReporteHelper
 import com.example.silomonitorapp.ui.components.AriztiaTopBar
 import com.example.silomonitorapp.ui.components.BarraNivelAnimada
 import com.example.silomonitorapp.ui.components.EstadoBadge
@@ -61,6 +68,7 @@ fun DashboardScreen(
     solicitudesPendientes: Int,
     onVolver: () -> Unit,
 ) {
+    val context = LocalContext.current
     val capacidadTotal = silos.sumOf { it.capacidadMaxKg }
     val stockTotal = silos.sumOf { it.stockActualKg }
     val llenadoGlobal = if (capacidadTotal > 0) (stockTotal / capacidadTotal * 100).toFloat() else 0f
@@ -68,7 +76,26 @@ fun DashboardScreen(
     val menorAutonomia = silos.filter { it.horasAutonomia != null }.minByOrNull { it.horasAutonomia!! }
 
     Scaffold(
-        topBar = { AriztiaTopBar(titulo = "Dashboard", onVolver = onVolver) },
+        topBar = {
+            AriztiaTopBar(
+                titulo = "Dashboard",
+                onVolver = onVolver,
+                acciones = {
+                    IconButton(onClick = {
+                        val file = ReporteHelper.generarCsvInventario(context, silos)
+                        ReporteHelper.compartirArchivo(context, file, "text/csv")
+                    }) {
+                        Icon(Icons.Filled.TableChart, contentDescription = "Exportar CSV")
+                    }
+                    IconButton(onClick = {
+                        val file = ReporteHelper.generarPdfInventario(context, silos)
+                        ReporteHelper.compartirArchivo(context, file, "application/pdf")
+                    }) {
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "Exportar PDF")
+                    }
+                },
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         Column(

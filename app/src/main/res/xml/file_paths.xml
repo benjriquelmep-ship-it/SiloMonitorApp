@@ -2,4 +2,7 @@
 <paths>
     <!-- Fotos de evidencia guardadas en la memoria interna de la app -->
     <files-path name="evidencias" path="evidencias/" />
+
+    <!-- Archivos generados para reportes CSV y PDF -->
+    <cache-path name="reportes_cache" path="reportes/" />
 </paths>
