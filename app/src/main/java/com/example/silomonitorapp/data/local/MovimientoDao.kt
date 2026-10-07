@@ -13,4 +13,8 @@ interface MovimientoDao {
 
     @Query("SELECT * FROM movimientos WHERE siloId = :siloId ORDER BY fecha DESC LIMIT :limite")
     fun obtenerPorSilo(siloId: String, limite: Int = 20): Flow<List<MovimientoEntity>>
+
+    // Para el dashboard: todos los movimientos desde una fecha
+    @Query("SELECT * FROM movimientos WHERE fecha >= :desde ORDER BY fecha ASC")
+    fun obtenerDesde(desde: Long): Flow<List<MovimientoEntity>>
 }

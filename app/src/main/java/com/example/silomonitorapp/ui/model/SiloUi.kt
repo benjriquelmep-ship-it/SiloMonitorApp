@@ -74,3 +74,27 @@ data class MovimientoUi(
     val fotoUri: String?,
     val pendienteSincronizar: Boolean,
 )
+
+enum class EstadoSolicitud(val etiqueta: String) {
+    PENDIENTE("Pendiente"),
+    APROBADA("Aprobada"),
+    RECHAZADA("Rechazada"),
+}
+
+/** Solicitud de camión de reposición para la bandeja de coordinación. */
+data class SolicitudUi(
+    val id: Long,
+    val siloId: String,
+    val siloNombre: String,
+    val granja: String,
+    val kgSolicitados: Double,
+    val urgente: Boolean,
+    val observacion: String,
+    val solicitadoPor: String,
+    val fechaSolicitud: Long,
+    val estado: EstadoSolicitud,
+    val revisadoPor: String?,
+)
+
+/** Total de kilos consumidos en un día, para el gráfico del dashboard. */
+data class ConsumoDia(val etiqueta: String, val kg: Double)

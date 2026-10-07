@@ -63,6 +63,23 @@ object ReglasTerreno {
         else -> null
     }
 
+    /** Kilos sugeridos para un camión de reposición: lo que falta para llenar el silo. */
+    fun kgSugeridosReposicion(stockActual: Double, capacidadMaxima: Double): Double =
+        (capacidadMaxima - stockActual).coerceAtLeast(0.0)
+
+    /**
+     * Valida una solicitud de camión: la carga pedida debe caber en el silo.
+     * Devuelve el mensaje de error, o null si es válida.
+     */
+    fun validarSolicitudCamion(stockActual: Double, capacidadMaxima: Double, kgSolicitados: Double): String? {
+        val espacioLibre = kgSugeridosReposicion(stockActual, capacidadMaxima)
+        return when {
+            kgSolicitados <= 0 -> "La cantidad debe ser mayor a 0 kg."
+            kgSolicitados > espacioLibre -> "Solo caben ${espacioLibre.toInt()} kg en el silo."
+            else -> null
+        }
+    }
+
     /** Horas de autonomía = (Stock actual / Consumo promedio diario) * 24 */
     fun horasAutonomia(stockActualKg: Double, consumoPromedioDiarioKg: Double): Double? =
         if (consumoPromedioDiarioKg > 0.0) stockActualKg / consumoPromedioDiarioKg * 24 else null

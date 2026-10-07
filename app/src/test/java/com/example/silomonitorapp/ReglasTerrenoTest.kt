@@ -119,6 +119,20 @@ class ReglasTerrenoTest {
         assertTrue(validar(latitud = -120.0) != null)
     }
 
+    // --- Solicitud de camión ---
+
+    @Test
+    fun camion_sugiereLoQueFaltaParaLlenarElSilo() {
+        assertEquals(21_100.0, ReglasTerreno.kgSugeridosReposicion(3_900.0, 25_000.0), 0.0)
+    }
+
+    @Test
+    fun camion_validaQueLaCargaQuepaEnElSilo() {
+        assertNull(ReglasTerreno.validarSolicitudCamion(3_900.0, 25_000.0, 21_100.0))
+        assertTrue(ReglasTerreno.validarSolicitudCamion(3_900.0, 25_000.0, 21_101.0) != null)
+        assertTrue(ReglasTerreno.validarSolicitudCamion(3_900.0, 25_000.0, 0.0) != null)
+    }
+
     // --- Semáforo ---
 
     @Test

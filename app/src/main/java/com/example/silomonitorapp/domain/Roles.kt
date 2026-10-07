@@ -18,6 +18,22 @@ enum class Rol(val etiqueta: String) {
     val puedeGestionarSilos: Boolean
         get() = this == ADMIN
 
+    /** Supervisor solicita camión de reposición; Admin tiene control total. */
+    val puedeSolicitarCamion: Boolean
+        get() = this == SUPERVISOR || this == ADMIN
+
+    /** Jefatura aprueba y planifica las reposiciones; Admin tiene control total. */
+    val puedeAprobarCamion: Boolean
+        get() = this == JEFATURA || this == ADMIN
+
+    /** El Operario no ve la coordinación de reposición. */
+    val puedeVerSolicitudes: Boolean
+        get() = this != OPERARIO
+
+    /** Dashboard analítico con gráficos: Jefatura y Admin. */
+    val puedeVerDashboard: Boolean
+        get() = this == JEFATURA || this == ADMIN
+
     /** Operario: el QR abre directo el formulario. El resto abre la ficha técnica. */
     val qrAbreFormulario: Boolean
         get() = this == OPERARIO

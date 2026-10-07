@@ -10,19 +10,26 @@ import com.example.silomonitorapp.data.local.SiloEntity
 import com.example.silomonitorapp.data.local.SiloRepository
 import com.example.silomonitorapp.domain.ReglasTerreno
 import com.example.silomonitorapp.notificaciones.NotificadorAlertas
+import com.example.silomonitorapp.ui.model.ConsumoDia
 import com.example.silomonitorapp.ui.model.DatosSilo
 import com.example.silomonitorapp.ui.model.EstadoSilo
+import com.example.silomonitorapp.ui.model.EstadoSolicitud
 import com.example.silomonitorapp.ui.model.MovimientoUi
 import com.example.silomonitorapp.ui.model.SiloUi
+import com.example.silomonitorapp.ui.model.SolicitudUi
 import com.example.silomonitorapp.ui.model.TipoMovimiento
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class SiloViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -67,6 +74,66 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    /** Bandeja de solicitudes de camión, con el nombre y la granja de cada silo. */
+    val solicitudesUi: StateFlow<List<SolicitudUi>> =
+        combine(repository.solicitudesFlow, repository.silosFlow) { solicitudes, silos ->
+            val silosPorId = silos.associateBy { it.id }
+            solicitudes.map { s ->
+                val silo = silosPorId[s.siloId]
+                SolicitudUi(
+                    id = s.id,
+                    siloId = s.siloId,
+                    siloNombre = silo?.nombre ?: s.siloId,
+                    granja = silo?.granja.orEmpty(),
+                    kgSolicitados = s.kgSolicitados,
+                    urgente = s.urgente,
+                    observacion = s.observacion,
+                    solicitadoPor = s.solicitadoPor,
+                    fechaSolicitud = s.fechaSolicitud,
+                    estado = EstadoSolicitud.valueOf(s.estado),
+                    revisadoPor = s.revisadoPor
+                )
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Kilos consumidos por día en los últimos [dias] días (incluye días sin consumo). */
+    fun consumoUltimosDias(dias: Int = 7): Flow<List<ConsumoDia>> {
+        val inicio = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            add(Calendar.DAY_OF_YEAR, -(dias - 1))
+        }
+        val formato = SimpleDateFormat("EEE d", Locale.forLanguageTag("es-CL"))
+        return repository.movimientosDesdeFlow(inicio.timeInMillis).map { movimientos ->
+            val consumos = movimientos.filter { it.tipo == "CONSUMO" }
+            (0 until dias).map { i ->
+                val desde = (inicio.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, i) }
+                val hasta = (desde.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, 1) }
+                ConsumoDia(
+                    etiqueta = formato.format(desde.time),
+                    kg = consumos.filter { it.fecha >= desde.timeInMillis && it.fecha < hasta.timeInMillis }.sumOf { it.cantidadKg }
+                )
+            }
+        }
+    }
+
+    /** Devuelve el mensaje de error para mostrar en el diálogo, o null si se envió. */
+    suspend fun solicitarCamion(siloId: String, kg: Double, urgente: Boolean, observacion: String, usuario: String): String? =
+        repository.solicitarCamion(siloId, kg, urgente, observacion.trim(), usuario).fold(
+            onSuccess = {
+                _mensajeOperacion.value = "Camión solicitado. Queda pendiente de aprobación por Jefatura."
+                null
+            },
+            onFailure = { it.message ?: "No se pudo solicitar el camión" }
+        )
+
+    fun revisarSolicitud(id: Long, aprobada: Boolean, usuario: String) {
+        viewModelScope.launch {
+            repository.revisarSolicitud(id, aprobada, usuario)
+                .onSuccess { _mensajeOperacion.value = if (aprobada) "Reposición aprobada" else "Solicitud rechazada" }
+                .onFailure { _mensajeOperacion.value = it.message }
         }
     }
 

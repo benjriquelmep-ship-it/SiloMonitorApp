@@ -54,6 +54,23 @@ class RolesTest {
     }
 
     @Test
+    fun supervisorSolicitaCamion_yJefaturaAprueba() {
+        assertTrue(Rol.SUPERVISOR.puedeSolicitarCamion)
+        assertFalse(Rol.SUPERVISOR.puedeAprobarCamion)
+        assertTrue(Rol.JEFATURA.puedeAprobarCamion)
+        assertFalse(Rol.JEFATURA.puedeSolicitarCamion)
+        assertFalse(Rol.OPERARIO.puedeVerSolicitudes)
+    }
+
+    @Test
+    fun soloJefaturaYAdmin_venDashboard() {
+        assertTrue(Rol.JEFATURA.puedeVerDashboard)
+        assertTrue(Rol.ADMIN.puedeVerDashboard)
+        assertFalse(Rol.OPERARIO.puedeVerDashboard)
+        assertFalse(Rol.SUPERVISOR.puedeVerDashboard)
+    }
+
+    @Test
     fun operario_soloVeSuGranja_yJefaturaVeTodas() {
         val operario = UsuariosDemo.buscar("operario")!!
         assertTrue(operario.puedeVerGranja("Granja El Paico"))
