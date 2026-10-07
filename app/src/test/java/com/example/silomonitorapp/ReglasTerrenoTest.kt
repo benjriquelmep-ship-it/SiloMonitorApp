@@ -70,6 +70,55 @@ class ReglasTerrenoTest {
         assertNull(ReglasTerreno.horasAutonomia(6_000.0, 0.0))
     }
 
+    // --- Alta de silos ---
+
+    private fun validar(
+        codigo: String = "SIL-007",
+        nombre: String = "Silo Nuevo",
+        granja: String = "Granja El Paico",
+        capacidad: Double = 30_000.0,
+        stock: Double = 10_000.0,
+        consumo: Double = 2_000.0,
+        latitud: Double = -33.70,
+        longitud: Double = -71.00,
+    ) = ReglasTerreno.validarSilo(codigo, nombre, granja, capacidad, stock, consumo, latitud, longitud)
+
+    @Test
+    fun altaSilo_conDatosValidos_noTieneErrores() {
+        assertNull(validar())
+    }
+
+    @Test
+    fun altaSilo_conCodigoMalFormado_esRechazada() {
+        assertTrue(validar(codigo = "") != null)
+        assertTrue(validar(codigo = "SIL 007") != null)
+        assertTrue(validar(codigo = "SILO#7") != null)
+        assertTrue(validar(codigo = "A".repeat(21)) != null)
+    }
+
+    @Test
+    fun altaSilo_aceptaCualquierCodigoConLetrasNumerosYGuiones() {
+        assertNull(validar(codigo = "SIL-007"))
+        assertNull(validar(codigo = "TOLVA-12"))
+        assertNull(validar(codigo = "A1"))
+    }
+
+    @Test
+    fun altaSilo_conStockMayorACapacidad_esRechazada() {
+        assertTrue(validar(stock = 40_000.0) != null)
+    }
+
+    @Test
+    fun altaSilo_sinNombreOCapacidad_esRechazada() {
+        assertTrue(validar(nombre = " ") != null)
+        assertTrue(validar(capacidad = 0.0) != null)
+    }
+
+    @Test
+    fun altaSilo_conCoordenadasFueraDeRango_esRechazada() {
+        assertTrue(validar(latitud = -120.0) != null)
+    }
+
     // --- Semáforo ---
 
     @Test

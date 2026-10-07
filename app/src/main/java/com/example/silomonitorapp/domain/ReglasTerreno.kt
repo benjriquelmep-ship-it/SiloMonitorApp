@@ -36,6 +36,33 @@ object ReglasTerreno {
         return Result.success(nuevoNivel)
     }
 
+    /**
+     * Valida los datos maestros de un silo antes de darlo de alta o editarlo.
+     * Devuelve el mensaje de error, o null si los datos son válidos.
+     */
+    fun validarSilo(
+        codigo: String,
+        nombre: String,
+        granja: String,
+        capacidadMaxima: Double,
+        stockActual: Double,
+        consumoPromedioDiario: Double,
+        latitud: Double,
+        longitud: Double
+    ): String? = when {
+        codigo.isBlank() -> "El código del silo es obligatorio."
+        // Sin espacios ni símbolos: el mismo código va impreso en el QR del silo
+        !Regex("^[A-Z0-9-]{1,20}$").matches(codigo) -> "El código solo puede tener letras, números y guiones (máx. 20)."
+        nombre.isBlank() -> "El nombre del silo es obligatorio."
+        granja.isBlank() -> "La granja es obligatoria."
+        capacidadMaxima <= 0 -> "La capacidad máxima debe ser mayor a 0 kg."
+        stockActual < 0 -> "El stock no puede ser negativo."
+        stockActual > capacidadMaxima -> "El stock no puede superar la capacidad máxima."
+        consumoPromedioDiario < 0 -> "El consumo diario no puede ser negativo."
+        latitud !in -90.0..90.0 || longitud !in -180.0..180.0 -> "Las coordenadas no son válidas."
+        else -> null
+    }
+
     /** Horas de autonomía = (Stock actual / Consumo promedio diario) * 24 */
     fun horasAutonomia(stockActualKg: Double, consumoPromedioDiarioKg: Double): Double? =
         if (consumoPromedioDiarioKg > 0.0) stockActualKg / consumoPromedioDiarioKg * 24 else null
