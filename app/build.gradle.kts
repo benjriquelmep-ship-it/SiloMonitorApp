@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    // Lee app/google-services.json para que Firebase (Firestore) se inicialice al abrir la app
+    id("com.google.gms.google-services")
 }
 
 // La API key de Google Maps se lee desde local.properties (MAPS_API_KEY=...), nunca se sube al repo
