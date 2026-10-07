@@ -250,18 +250,17 @@ fun AppNavHost(
                 silo = silos.firstOrNull { it.id == id },
                 error = error,
                 onVolver = { navController.popBackStack() },
-                onGuardar = { tipo, kg, observacion ->
+                onGuardar = { tipo, kg, observacion, foto ->
                     scope.launch {
-                        error = viewModel.registrarMovimiento(id, tipo, kg, observacion, fotoUri?.toString())
+                        error = viewModel.registrarMovimiento(id, tipo, kg, observacion, foto?.toString())
                         if (error == null) navController.popBackStack()
                     }
                 },
                 onAdjuntarFoto = {
                     val tienePermiso = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
+                            PackageManager.PERMISSION_GRANTED
                     if (tienePermiso) abrirCamara() else pedirPermisoCamara.launch(Manifest.permission.CAMERA)
                 },
-                fotoUri = fotoUri,
             )
         }
 
