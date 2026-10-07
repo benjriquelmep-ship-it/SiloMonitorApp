@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.silomonitorapp.data.local.AppDatabase
 import com.example.silomonitorapp.data.local.SiloEntity
 import com.example.silomonitorapp.data.local.SiloRepository
+import com.example.silomonitorapp.data.remote.SyncRepository
 import com.example.silomonitorapp.domain.ReglasTerreno
 import com.example.silomonitorapp.notificaciones.NotificadorAlertas
 import com.example.silomonitorapp.ui.model.ConsumoDia
@@ -34,6 +35,11 @@ import java.util.Locale
 class SiloViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: SiloRepository
+    private val syncRepository: SyncRepository = SyncRepository(application)
+
+    // Estado reactivo de la sincronización remota con Firestore
+    private val _sincronizando = MutableStateFlow(false)
+    val sincronizando: StateFlow<Boolean> = _sincronizando.asStateFlow()
 
     // Mapeo reactivo directo de Room a SiloUi
     val silosUi: StateFlow<List<SiloUi>>
@@ -73,6 +79,25 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
                 repository.precargarSilosSiEstaVacio()
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+    }
+
+    /** Sincroniza lotes pendientes de Room hacia Cloud Firestore */
+    fun sincronizarConFirestore() {
+        if (_sincronizando.value) return
+        viewModelScope.launch {
+            _sincronizando.value = true
+            val res = syncRepository.sincronizarTodo()
+            _sincronizando.value = false
+            _mensajeOperacion.value = if (res.exitoso) {
+                if (res.movimientosSincronizados == 0 && res.solicitudesSincronizadas == 0) {
+                    "Todo está al día con la nube"
+                } else {
+                    "Sincronizados: ${res.movimientosSincronizados} movimientos y ${res.solicitudesSincronizadas} solicitudes"
+                }
+            } else {
+                "Error al sincronizar: ${res.error ?: "desconocido"}"
             }
         }
     }
