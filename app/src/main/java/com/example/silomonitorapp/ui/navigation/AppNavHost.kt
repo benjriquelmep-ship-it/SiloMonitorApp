@@ -29,7 +29,9 @@ import com.example.silomonitorapp.ui.components.crearUriFotoEvidencia
 import com.example.silomonitorapp.ui.screens.MapaSilosScreen
 import com.example.silomonitorapp.ui.screens.MovimientoFormScreen
 import com.example.silomonitorapp.ui.screens.QrScannerScreen
+import com.example.silomonitorapp.ui.model.DatosSilo
 import com.example.silomonitorapp.ui.screens.SiloDetailScreen
+import com.example.silomonitorapp.ui.screens.SiloFormScreen
 import com.example.silomonitorapp.ui.screens.SiloListScreen
 import com.example.silomonitorapp.ui.viewmodel.SiloViewModel
 import kotlinx.coroutines.launch
@@ -42,10 +44,13 @@ object Rutas {
     const val MOVIMIENTO = "movimiento/{$ARG_SILO_ID}"
     const val MAPA = "mapa?$ARG_SILO_ID={$ARG_SILO_ID}"
     const val ESCANER = "escaner"
+    const val FORMULARIO_SILO = "silo_form?$ARG_SILO_ID={$ARG_SILO_ID}"
 
     fun detalle(siloId: String) = "detalle/$siloId"
     fun movimiento(siloId: String) = "movimiento/$siloId"
     fun mapa(siloId: String? = null) = if (siloId == null) "mapa" else "mapa?$ARG_SILO_ID=$siloId"
+    /** Sin id: alta de un silo nuevo. Con id: edición de ese silo. */
+    fun formularioSilo(siloId: String? = null) = if (siloId == null) "silo_form" else "silo_form?$ARG_SILO_ID=$siloId"
 }
 
 private const val DURACION_TRANSICION_MS = 350
@@ -81,6 +86,7 @@ fun AppNavHost(
                 onSiloClick = { navController.navigate(Rutas.detalle(it.id)) },
                 onAbrirMapa = { navController.navigate(Rutas.mapa()) },
                 onEscanearQr = { navController.navigate(Rutas.ESCANER) },
+                onAgregarSilo = { navController.navigate(Rutas.formularioSilo()) },
             )
         }
 
@@ -96,6 +102,36 @@ fun AppNavHost(
                 onRegistrarMovimiento = { navController.navigate(Rutas.movimiento(it.id)) },
                 onVerEnMapa = { navController.navigate(Rutas.mapa(it.id)) },
                 movimientos = movimientos,
+                onEditar = { navController.navigate(Rutas.formularioSilo(it.id)) },
+            )
+        }
+
+        composable(
+            Rutas.FORMULARIO_SILO,
+            arguments = listOf(navArgument(Rutas.ARG_SILO_ID) {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            }),
+        ) { entrada ->
+            val idEditar = entrada.arguments?.getString(Rutas.ARG_SILO_ID)
+            val esNuevo = idEditar == null
+            var datosIniciales by remember { mutableStateOf<DatosSilo?>(null) }
+            var error by remember { mutableStateOf<String?>(null) }
+            LaunchedEffect(idEditar) {
+                if (idEditar != null) datosIniciales = viewModel.obtenerDatosSilo(idEditar)
+            }
+            SiloFormScreen(
+                datosIniciales = datosIniciales,
+                esNuevo = esNuevo,
+                error = error,
+                onVolver = { navController.popBackStack() },
+                onGuardar = { datos ->
+                    scope.launch {
+                        error = viewModel.guardarSilo(datos, esNuevo)
+                        if (error == null) navController.popBackStack()
+                    }
+                },
             )
         }
 

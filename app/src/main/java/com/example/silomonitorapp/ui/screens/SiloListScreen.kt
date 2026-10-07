@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -49,6 +50,7 @@ fun SiloListScreen(
     onSiloClick: (SiloUi) -> Unit,
     onAbrirMapa: () -> Unit,
     onEscanearQr: () -> Unit,
+    onAgregarSilo: () -> Unit = {},
 ) {
     var busqueda by rememberSaveable { mutableStateOf("") }
     var filtro by rememberSaveable { mutableStateOf<EstadoSilo?>(null) }
@@ -70,6 +72,9 @@ fun SiloListScreen(
             AriztiaTopBar(
                 titulo = "Monitoreo de Silos",
                 acciones = {
+                    IconButton(onClick = onAgregarSilo) {
+                        Icon(Icons.Filled.Add, contentDescription = "Agregar silo")
+                    }
                     IconButton(onClick = onAbrirMapa) {
                         Icon(Icons.Filled.Map, contentDescription = "Ver mapa")
                     }

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Place
@@ -24,6 +25,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -59,9 +61,22 @@ fun SiloDetailScreen(
     onRegistrarMovimiento: (SiloUi) -> Unit,
     onVerEnMapa: (SiloUi) -> Unit,
     movimientos: List<MovimientoUi> = emptyList(),
+    onEditar: (SiloUi) -> Unit = {},
 ) {
     Scaffold(
-        topBar = { AriztiaTopBar(titulo = silo?.nombre ?: "Silo", onVolver = onVolver) },
+        topBar = {
+            AriztiaTopBar(
+                titulo = silo?.nombre ?: "Silo",
+                onVolver = onVolver,
+                acciones = {
+                    if (silo != null) {
+                        IconButton(onClick = { onEditar(silo) }) {
+                            Icon(Icons.Filled.Edit, contentDescription = "Editar silo")
+                        }
+                    }
+                },
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
         if (silo == null) {
