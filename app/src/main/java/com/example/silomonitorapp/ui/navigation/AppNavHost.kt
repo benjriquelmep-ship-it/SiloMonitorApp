@@ -65,7 +65,10 @@ fun AppNavHost(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val silos by viewModel.silosUi.collectAsState()
+    val todosLosSilos by viewModel.silosUi.collectAsState()
+    // RBAC: cada usuario solo ve los silos de las granjas que tiene asignadas
+    val silos = todosLosSilos.filter { usuario.puedeVerGranja(it.granja) }
+    val rol = usuario.rol
     val mensajeOperacion by viewModel.mensajeOperacion.collectAsState()
 
     LaunchedEffect(mensajeOperacion) {
@@ -89,7 +92,9 @@ fun AppNavHost(
                 onSiloClick = { navController.navigate(Rutas.detalle(it.id)) },
                 onAbrirMapa = { navController.navigate(Rutas.mapa()) },
                 onEscanearQr = { navController.navigate(Rutas.ESCANER) },
-                onAgregarSilo = { navController.navigate(Rutas.formularioSilo()) },
+                onAgregarSilo = if (rol.puedeGestionarSilos) {
+                    { navController.navigate(Rutas.formularioSilo()) }
+                } else null,
                 usuario = usuario,
                 onCerrarSesion = onCerrarSesion,
             )
@@ -104,10 +109,14 @@ fun AppNavHost(
             SiloDetailScreen(
                 silo = silos.firstOrNull { it.id == id },
                 onVolver = { navController.popBackStack() },
-                onRegistrarMovimiento = { navController.navigate(Rutas.movimiento(it.id)) },
+                onRegistrarMovimiento = if (rol.puedeRegistrarMovimientos) {
+                    { navController.navigate(Rutas.movimiento(it.id)) }
+                } else null,
                 onVerEnMapa = { navController.navigate(Rutas.mapa(it.id)) },
                 movimientos = movimientos,
-                onEditar = { navController.navigate(Rutas.formularioSilo(it.id)) },
+                onEditar = if (rol.puedeGestionarSilos) {
+                    { navController.navigate(Rutas.formularioSilo(it.id)) }
+                } else null,
             )
         }
 
@@ -119,6 +128,11 @@ fun AppNavHost(
                 defaultValue = null
             }),
         ) { entrada ->
+            // Protección extra: aunque se llegue a la ruta, sin permiso se vuelve atrás
+            if (!rol.puedeGestionarSilos) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+                return@composable
+            }
             val idEditar = entrada.arguments?.getString(Rutas.ARG_SILO_ID)
             val esNuevo = idEditar == null
             var datosIniciales by remember { mutableStateOf<DatosSilo?>(null) }
@@ -144,6 +158,10 @@ fun AppNavHost(
             Rutas.MOVIMIENTO,
             arguments = listOf(navArgument(Rutas.ARG_SILO_ID) { type = NavType.StringType }),
         ) { entrada ->
+            if (!rol.puedeRegistrarMovimientos) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+                return@composable
+            }
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             var error by remember { mutableStateOf<String?>(null) }
 
@@ -201,15 +219,26 @@ fun AppNavHost(
 
         composable(Rutas.ESCANER) {
             QrScannerScreen(
-                // Operario: el QR abre directo el formulario de movimiento del silo
-                onCodigoEscaneado = { codigo ->
+                // Operario: el QR abre directo el formulario. Los demás roles: la ficha técnica
+                onCodigoEscaneado = { leido ->
+                    val codigo = leido.trim().uppercase()
                     scope.launch {
-                        if (viewModel.existeSilo(codigo)) {
-                            navController.navigate(Rutas.movimiento(codigo)) {
-                                popUpTo(Rutas.ESCANER) { inclusive = true }
+                        val existe = viewModel.existeSilo(codigo)
+                        val tieneAcceso = silos.any { it.id == codigo }
+                        when {
+                            !existe -> navController.popBackStack()
+                            !tieneAcceso -> {
+                                Toast.makeText(context, "No tienes acceso al silo $codigo", Toast.LENGTH_LONG).show()
+                                navController.popBackStack()
                             }
-                        } else {
-                            navController.popBackStack()
+                            else -> {
+                                val destino = if (rol.qrAbreFormulario && rol.puedeRegistrarMovimientos) {
+                                    Rutas.movimiento(codigo)
+                                } else {
+                                    Rutas.detalle(codigo)
+                                }
+                                navController.navigate(destino) { popUpTo(Rutas.ESCANER) { inclusive = true } }
+                            }
                         }
                     }
                 },

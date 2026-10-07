@@ -58,7 +58,7 @@ fun SiloListScreen(
     onSiloClick: (SiloUi) -> Unit,
     onAbrirMapa: () -> Unit,
     onEscanearQr: () -> Unit,
-    onAgregarSilo: () -> Unit = {},
+    onAgregarSilo: (() -> Unit)? = null, // null: el rol no puede crear silos
     usuario: Usuario? = null,
     onCerrarSesion: () -> Unit = {},
 ) {
@@ -82,8 +82,10 @@ fun SiloListScreen(
             AriztiaTopBar(
                 titulo = "Monitoreo de Silos",
                 acciones = {
-                    IconButton(onClick = onAgregarSilo) {
-                        Icon(Icons.Filled.Add, contentDescription = "Agregar silo")
+                    if (onAgregarSilo != null) {
+                        IconButton(onClick = onAgregarSilo) {
+                            Icon(Icons.Filled.Add, contentDescription = "Agregar silo")
+                        }
                     }
                     IconButton(onClick = onAbrirMapa) {
                         Icon(Icons.Filled.Map, contentDescription = "Ver mapa")
