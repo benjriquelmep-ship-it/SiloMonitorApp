@@ -71,6 +71,6 @@ data class MovimientoUi(
     val cantidadKg: Double,
     val fecha: Long,
     val observacion: String,
-    val tieneFoto: Boolean,
+    val fotoUri: String?,
     val pendienteSincronizar: Boolean,
 )

@@ -1,5 +1,6 @@
 package com.example.silomonitorapp.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +19,6 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -42,6 +42,7 @@ import com.example.silomonitorapp.ui.components.EstadoBadge
 import com.example.silomonitorapp.ui.components.SiloNivelVertical
 import com.example.silomonitorapp.ui.components.color
 import com.example.silomonitorapp.ui.components.formatearAutonomia
+import com.example.silomonitorapp.ui.components.MiniaturaFoto
 import com.example.silomonitorapp.ui.components.formatearKg
 import com.example.silomonitorapp.ui.model.EstadoSilo
 import com.example.silomonitorapp.ui.model.MovimientoUi
@@ -193,7 +194,7 @@ private fun HistorialMovimientos(movimientos: List<MovimientoUi>) {
 private fun FilaMovimiento(movimiento: MovimientoUi) {
     val esCarga = movimiento.tipo == TipoMovimiento.CARGA
     val colorTipo = if (esCarga) SemaforoNormal else MaterialTheme.colorScheme.primary
-    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.Top) {
         Icon(
             if (esCarga) Icons.Filled.ArrowUpward else Icons.Filled.ArrowDownward,
             contentDescription = movimiento.tipo.etiqueta,
@@ -214,9 +215,9 @@ private fun FilaMovimiento(movimiento: MovimientoUi) {
             if (movimiento.observacion.isNotBlank()) {
                 Text(movimiento.observacion, style = MaterialTheme.typography.bodySmall)
             }
-        }
-        if (movimiento.tieneFoto) {
-            Icon(Icons.Filled.PhotoCamera, contentDescription = "Con foto de evidencia", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            movimiento.fotoUri?.let {
+                MiniaturaFoto(Uri.parse(it), Modifier.padding(top = 8.dp))
+            }
         }
         if (movimiento.pendienteSincronizar) {
             Spacer(Modifier.width(8.dp))

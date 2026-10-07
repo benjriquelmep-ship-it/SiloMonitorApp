@@ -80,7 +80,7 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
                     cantidadKg = m.cantidadKg,
                     fecha = m.fecha,
                     observacion = m.observacion,
-                    tieneFoto = m.fotoUri != null,
+                    fotoUri = m.fotoUri,
                     pendienteSincronizar = m.pendienteSincronizar
                 )
             }
