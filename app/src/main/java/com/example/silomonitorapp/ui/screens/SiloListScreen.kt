@@ -17,11 +17,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -61,6 +64,9 @@ fun SiloListScreen(
     onAgregarSilo: (() -> Unit)? = null, // null: el rol no puede crear silos
     usuario: Usuario? = null,
     onCerrarSesion: () -> Unit = {},
+    onAbrirDashboard: (() -> Unit)? = null, // null: el rol no ve el dashboard
+    onAbrirSolicitudes: (() -> Unit)? = null, // null: el rol no ve la reposición
+    solicitudesPendientes: Int = 0,
 ) {
     var busqueda by rememberSaveable { mutableStateOf("") }
     var filtro by rememberSaveable { mutableStateOf<EstadoSilo?>(null) }
@@ -114,7 +120,9 @@ fun SiloListScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            usuario?.let { item { TarjetaUsuario(it) } }
+            usuario?.let {
+                item { TarjetaUsuario(it, onAbrirDashboard, onAbrirSolicitudes, solicitudesPendientes) }
+            }
             item {
                 ResumenSemaforo(
                     silos = silos,
@@ -163,13 +171,19 @@ fun SiloListScreen(
 
 /** Quién está conectado, con qué rol y qué granjas puede ver. */
 @Composable
-private fun TarjetaUsuario(usuario: Usuario) {
+private fun TarjetaUsuario(
+    usuario: Usuario,
+    onAbrirDashboard: (() -> Unit)?,
+    onAbrirSolicitudes: (() -> Unit)?,
+    solicitudesPendientes: Int,
+) {
     Card(
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
@@ -189,6 +203,25 @@ private fun TarjetaUsuario(usuario: Usuario) {
                     .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             )
+            }
+            if (onAbrirDashboard != null || onAbrirSolicitudes != null) {
+                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    onAbrirDashboard?.let {
+                        AssistChip(
+                            onClick = it,
+                            label = { Text("Dashboard") },
+                            leadingIcon = { Icon(Icons.Filled.BarChart, contentDescription = null) },
+                        )
+                    }
+                    onAbrirSolicitudes?.let {
+                        AssistChip(
+                            onClick = it,
+                            label = { Text(if (solicitudesPendientes > 0) "Reposición ($solicitudesPendientes)" else "Reposición") },
+                            leadingIcon = { Icon(Icons.Filled.LocalShipping, contentDescription = null) },
+                        )
+                    }
+                }
+            }
         }
     }
 }

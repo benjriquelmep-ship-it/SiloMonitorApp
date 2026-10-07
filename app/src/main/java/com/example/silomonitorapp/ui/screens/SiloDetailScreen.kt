@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,6 +64,7 @@ fun SiloDetailScreen(
     onVerEnMapa: (SiloUi) -> Unit,
     movimientos: List<MovimientoUi> = emptyList(),
     onEditar: ((SiloUi) -> Unit)? = null, // null: el rol no puede editar silos
+    onSolicitarCamion: ((SiloUi) -> Unit)? = null, // null: el rol no coordina reposición
 ) {
     Scaffold(
         topBar = {
@@ -147,6 +149,18 @@ fun SiloDetailScreen(
                     Icon(Icons.Filled.EditNote, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Registrar movimiento")
+                }
+            }
+            if (onSolicitarCamion != null) {
+                OutlinedButton(
+                    onClick = { onSolicitarCamion(silo) },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Icon(Icons.Filled.LocalShipping, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Solicitar camión de reposición")
                 }
             }
             OutlinedButton(
