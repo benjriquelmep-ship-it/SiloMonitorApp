@@ -31,4 +31,10 @@ interface SolicitudCamionDao {
         """
     )
     fun revisar(id: Long, estado: String, revisadoPor: String, fecha: Long): Int
+
+    @Query("SELECT * FROM solicitudes_camion WHERE pendienteSincronizar = 1")
+    fun obtenerPendientesSincronizar(): List<SolicitudCamionEntity>
+
+    @Query("UPDATE solicitudes_camion SET pendienteSincronizar = 0 WHERE id IN (:ids)")
+    fun marcarComoSincronizadas(ids: List<Long>): Int
 }
