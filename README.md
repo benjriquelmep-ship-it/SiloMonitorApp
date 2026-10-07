@@ -51,6 +51,13 @@ Se muestra en cada tarjeta y en la ficha técnica del silo.
 ### Dashboard (Jefatura y Administrador)
 - Indicadores: llenado global, silos críticos, menor autonomía y camiones pendientes.
 - Gráfico del consumo de los últimos 7 días y nivel de cada silo.
+- **Exportación de reportes** del inventario desde la barra superior del dashboard:
+  - **CSV** (separado por `;`, se abre directo en Excel): código, nombre, granja, galpón, capacidad, stock, porcentaje, estado y autonomía de cada silo.
+  - **PDF** en tamaño A4 con el mismo inventario.
+  - Ambos se comparten con el menú de Android (correo, WhatsApp, Drive, etc.).
+
+### Sincronización con la nube
+- Botón **⟳** en la barra superior para enviar a **Cloud Firestore** los movimientos y solicitudes pendientes, con indicador de progreso.
 
 ---
 
@@ -64,7 +71,7 @@ Se muestra en cada tarjeta y en la ficha técnica del silo.
 | Solicitar camión | — | ✅ | — | ✅ |
 | Aprobar o rechazar camiones | — | — | ✅ | ✅ |
 | Ver bandeja de reposición | — | ✅ (consulta) | ✅ | ✅ |
-| Dashboard | — | — | ✅ | ✅ |
+| Dashboard y exportación de reportes (PDF / CSV) | — | — | ✅ | ✅ |
 | Crear y editar silos | — | — | — | ✅ |
 
 Los permisos están centralizados en `domain/Roles.kt`. Las pantallas consultan el permiso (por ejemplo `rol.puedeRegistrarMovimientos`), no el nombre del rol, y cada ruta protegida devuelve al usuario atrás si no tiene acceso.
@@ -113,6 +120,7 @@ Pantallas Compose ──▶ ViewModel (StateFlow) ──▶ Repository ──▶
 | Nube | Firebase Cloud Firestore |
 | Cámara y QR | CameraX 1.6 + ML Kit Barcode Scanning (Play Services) |
 | Mapas y GPS | Maps Compose + Fused Location Provider |
+| Reportes | `PdfDocument` nativo de Android + CSV, compartidos con `FileProvider` |
 | Asincronía | Coroutines + StateFlow |
 | Tests | JUnit 4 |
 | SDK | mínimo Android 8.0 (API 26), objetivo API 35, compilación API 37 |
@@ -129,6 +137,7 @@ com.example.silomonitorapp/
 ├── data/
 │   ├── local/                      # Room: entidades, DAOs, AppDatabase y SiloRepository
 │   ├── remote/                     # SyncRepository: sincronización con Firestore
+│   ├── reports/                    # ReporteHelper: genera y comparte reportes CSV y PDF
 │   └── sesion/                     # Sesión guardada y usuarios de prueba
 ├── domain/
 │   ├── ReglasTerreno.kt            # Sobrellenado, saldo negativo, autonomía, validación de silos y camiones
@@ -190,7 +199,8 @@ Las reglas de negocio y los permisos tienen tests unitarios:
 | Login, sesión y permisos por rol | ✅ |
 | Solicitud y aprobación de camiones | ✅ |
 | Dashboard de Jefatura | ✅ |
-| Sincronización con Firestore | 🚧 En desarrollo |
+| Exportación de reportes PDF y CSV | ✅ |
+| Sincronización manual con Firestore (botón ⟳) | ✅ |
 | Subida de fotos a Firebase Storage | ⏳ Pendiente |
 | Sincronización automática al recuperar conexión (WorkManager) | ⏳ Pendiente |
 | Backend Spring Boot (`GET /api/silos`, `POST /api/movimientos`) + Retrofit | ⏳ Pendiente |
