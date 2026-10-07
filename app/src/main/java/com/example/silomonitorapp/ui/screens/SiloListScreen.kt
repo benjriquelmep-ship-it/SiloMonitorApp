@@ -8,25 +8,28 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.BarChart
-import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -67,6 +70,8 @@ fun SiloListScreen(
     onAbrirDashboard: (() -> Unit)? = null, // null: el rol no ve el dashboard
     onAbrirSolicitudes: (() -> Unit)? = null, // null: el rol no ve la reposición
     solicitudesPendientes: Int = 0,
+    sincronizando: Boolean = false,
+    onSincronizar: () -> Unit = {},
 ) {
     var busqueda by rememberSaveable { mutableStateOf("") }
     var filtro by rememberSaveable { mutableStateOf<EstadoSilo?>(null) }
@@ -75,10 +80,10 @@ fun SiloListScreen(
         .filter { filtro == null || it.estado == filtro }
         .filter {
             busqueda.isBlank() ||
-                it.nombre.contains(busqueda, ignoreCase = true) ||
-                it.codigo.contains(busqueda, ignoreCase = true) ||
-                it.granja.contains(busqueda, ignoreCase = true) ||
-                it.galpon.contains(busqueda, ignoreCase = true)
+                    it.nombre.contains(busqueda, ignoreCase = true) ||
+                    it.codigo.contains(busqueda, ignoreCase = true) ||
+                    it.granja.contains(busqueda, ignoreCase = true) ||
+                    it.galpon.contains(busqueda, ignoreCase = true)
         }
         // Los críticos primero, luego por menor nivel
         .sortedWith(compareByDescending<SiloUi> { it.estado.ordinal }.thenBy { it.porcentaje })
@@ -88,6 +93,19 @@ fun SiloListScreen(
             AriztiaTopBar(
                 titulo = "Monitoreo de Silos",
                 acciones = {
+                    if (sincronizando) {
+                        IconButton(onClick = {}, enabled = false) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = onSincronizar) {
+                            Icon(Icons.Filled.Sync, contentDescription = "Sincronizar con la nube")
+                        }
+                    }
                     if (onAgregarSilo != null) {
                         IconButton(onClick = onAgregarSilo) {
                             Icon(Icons.Filled.Add, contentDescription = "Agregar silo")
@@ -184,25 +202,25 @@ private fun TarjetaUsuario(
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(usuario.nombre, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(usuario.nombre, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        usuario.alcance,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
-                    usuario.alcance,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    usuario.rol.etiqueta,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
                 )
-            }
-            Text(
-                usuario.rol.etiqueta,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            )
             }
             if (onAbrirDashboard != null || onAbrirSolicitudes != null) {
                 Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
