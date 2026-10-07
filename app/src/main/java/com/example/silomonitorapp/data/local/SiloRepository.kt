@@ -9,10 +9,49 @@ class SiloRepository(private val db: AppDatabase) {
 
     private val siloDao = db.siloDao()
     private val movimientoDao = db.movimientoDao()
+    private val solicitudDao = db.solicitudCamionDao()
 
     val silosFlow: Flow<List<SiloEntity>> = siloDao.obtenerTodosLosSilos()
 
     fun historialFlow(siloId: String): Flow<List<MovimientoEntity>> = movimientoDao.obtenerPorSilo(siloId)
+
+    fun movimientosDesdeFlow(desde: Long): Flow<List<MovimientoEntity>> = movimientoDao.obtenerDesde(desde)
+
+    val solicitudesFlow: Flow<List<SolicitudCamionEntity>> = solicitudDao.obtenerTodas()
+
+    // Coordinar reposición: el Supervisor pide un camión para un silo
+    suspend fun solicitarCamion(
+        siloId: String,
+        kgSolicitados: Double,
+        urgente: Boolean,
+        observacion: String,
+        solicitadoPor: String
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        val silo = siloDao.obtenerSiloPorId(siloId)
+            ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
+        ReglasTerreno.validarSolicitudCamion(silo.nivelActual, silo.capacidadMaxima, kgSolicitados)
+            ?.let { return@withContext Result.failure(Exception(it)) }
+        if (solicitudDao.contarPendientesDeSilo(siloId) > 0) {
+            return@withContext Result.failure(Exception("Ya hay un camión pendiente de aprobación para este silo."))
+        }
+        solicitudDao.insertar(
+            SolicitudCamionEntity(
+                siloId = siloId,
+                kgSolicitados = kgSolicitados,
+                urgente = urgente,
+                observacion = observacion,
+                solicitadoPor = solicitadoPor
+            )
+        )
+        Result.success(Unit)
+    }
+
+    // La Jefatura aprueba o rechaza una solicitud pendiente
+    suspend fun revisarSolicitud(id: Long, aprobada: Boolean, revisadoPor: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val estado = if (aprobada) SolicitudCamionEntity.ESTADO_APROBADA else SolicitudCamionEntity.ESTADO_RECHAZADA
+        val filas = solicitudDao.revisar(id, estado, revisadoPor, System.currentTimeMillis())
+        if (filas == 0) Result.failure(Exception("La solicitud ya fue revisada.")) else Result.success(Unit)
+    }
 
     suspend fun obtenerSiloPorId(id: String): SiloEntity? = withContext(Dispatchers.IO) {
         siloDao.obtenerSiloPorId(id)

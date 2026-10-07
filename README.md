@@ -34,6 +34,21 @@
 
 ---
 
+## 🔐 Usuarios de Prueba (RBAC)
+
+Mientras no exista autenticación en el backend, la app trae un usuario de prueba por rol (definidos en `data/sesion/UsuariosDemo.kt`, con la contraseña guardada como hash SHA-256):
+
+| Usuario | Contraseña | Rol | Alcance |
+|---|---|---|---|
+| `operario` | `Operario2026!` | Operario | Granja El Paico |
+| `supervisor` | `Supervisor2026!` | Supervisor | Granja El Paico y Granja Pomaire |
+| `jefatura` | `Jefatura2026!` | Jefatura | Todas las granjas |
+| `admin` | `Admin2026!` | Administrador | Todas las granjas |
+
+> Son credenciales **solo de demostración**: se reemplazarán por usuarios reales al integrar el backend.
+
+---
+
 ## 🏗 Arquitectura Híbrida Offline-First
 
 Para asegurar operatividad continua en faenas agrícolas sin cobertura de red:

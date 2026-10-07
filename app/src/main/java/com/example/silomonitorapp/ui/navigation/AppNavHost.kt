@@ -26,13 +26,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.silomonitorapp.ui.components.crearUriFotoEvidencia
+import com.example.silomonitorapp.ui.components.SolicitarCamionDialog
+import com.example.silomonitorapp.ui.model.EstadoSolicitud
+import com.example.silomonitorapp.ui.screens.DashboardScreen
 import com.example.silomonitorapp.ui.screens.MapaSilosScreen
 import com.example.silomonitorapp.ui.screens.MovimientoFormScreen
 import com.example.silomonitorapp.ui.screens.QrScannerScreen
+import com.example.silomonitorapp.domain.Usuario
 import com.example.silomonitorapp.ui.model.DatosSilo
 import com.example.silomonitorapp.ui.screens.SiloDetailScreen
 import com.example.silomonitorapp.ui.screens.SiloFormScreen
 import com.example.silomonitorapp.ui.screens.SiloListScreen
+import com.example.silomonitorapp.ui.screens.SolicitudesScreen
 import com.example.silomonitorapp.ui.viewmodel.SiloViewModel
 import kotlinx.coroutines.launch
 
@@ -45,6 +50,8 @@ object Rutas {
     const val MAPA = "mapa?$ARG_SILO_ID={$ARG_SILO_ID}"
     const val ESCANER = "escaner"
     const val FORMULARIO_SILO = "silo_form?$ARG_SILO_ID={$ARG_SILO_ID}"
+    const val SOLICITUDES = "solicitudes"
+    const val DASHBOARD = "dashboard"
 
     fun detalle(siloId: String) = "detalle/$siloId"
     fun movimiento(siloId: String) = "movimiento/$siloId"
@@ -58,11 +65,20 @@ private const val DURACION_TRANSICION_MS = 350
 @Composable
 fun AppNavHost(
     viewModel: SiloViewModel,
+    usuario: Usuario,
+    onCerrarSesion: () -> Unit,
     navController: NavHostController = rememberNavController(),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val silos by viewModel.silosUi.collectAsState()
+    val todosLosSilos by viewModel.silosUi.collectAsState()
+    // RBAC: cada usuario solo ve los silos de las granjas que tiene asignadas
+    val silos = todosLosSilos.filter { usuario.puedeVerGranja(it.granja) }
+    val rol = usuario.rol
+    val idsVisibles = silos.map { it.id }.toSet()
+    val solicitudes by viewModel.solicitudesUi.collectAsState()
+    val solicitudesVisibles = solicitudes.filter { it.siloId in idsVisibles }
+    val pendientes = solicitudesVisibles.count { it.estado == EstadoSolicitud.PENDIENTE }
     val mensajeOperacion by viewModel.mensajeOperacion.collectAsState()
 
     LaunchedEffect(mensajeOperacion) {
@@ -86,7 +102,18 @@ fun AppNavHost(
                 onSiloClick = { navController.navigate(Rutas.detalle(it.id)) },
                 onAbrirMapa = { navController.navigate(Rutas.mapa()) },
                 onEscanearQr = { navController.navigate(Rutas.ESCANER) },
-                onAgregarSilo = { navController.navigate(Rutas.formularioSilo()) },
+                onAgregarSilo = if (rol.puedeGestionarSilos) {
+                    { navController.navigate(Rutas.formularioSilo()) }
+                } else null,
+                usuario = usuario,
+                onCerrarSesion = onCerrarSesion,
+                onAbrirDashboard = if (rol.puedeVerDashboard) {
+                    { navController.navigate(Rutas.DASHBOARD) }
+                } else null,
+                onAbrirSolicitudes = if (rol.puedeVerSolicitudes) {
+                    { navController.navigate(Rutas.SOLICITUDES) }
+                } else null,
+                solicitudesPendientes = pendientes,
             )
         }
 
@@ -96,13 +123,64 @@ fun AppNavHost(
         ) { entrada ->
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             val movimientos by remember(id) { viewModel.historial(id) }.collectAsState(initial = emptyList())
+            val silo = silos.firstOrNull { it.id == id }
+            var mostrarCamion by rememberSaveable { mutableStateOf(false) }
+            var errorCamion by remember { mutableStateOf<String?>(null) }
+            if (mostrarCamion && silo != null) {
+                SolicitarCamionDialog(
+                    silo = silo,
+                    error = errorCamion,
+                    onDismiss = { mostrarCamion = false; errorCamion = null },
+                    onConfirmar = { kg, urgente, observacion ->
+                        scope.launch {
+                            errorCamion = viewModel.solicitarCamion(silo.id, kg, urgente, observacion, usuario.usuario)
+                            if (errorCamion == null) mostrarCamion = false
+                        }
+                    },
+                )
+            }
             SiloDetailScreen(
-                silo = silos.firstOrNull { it.id == id },
+                silo = silo,
                 onVolver = { navController.popBackStack() },
-                onRegistrarMovimiento = { navController.navigate(Rutas.movimiento(it.id)) },
+                onRegistrarMovimiento = if (rol.puedeRegistrarMovimientos) {
+                    { navController.navigate(Rutas.movimiento(it.id)) }
+                } else null,
                 onVerEnMapa = { navController.navigate(Rutas.mapa(it.id)) },
                 movimientos = movimientos,
-                onEditar = { navController.navigate(Rutas.formularioSilo(it.id)) },
+                onEditar = if (rol.puedeGestionarSilos) {
+                    { navController.navigate(Rutas.formularioSilo(it.id)) }
+                } else null,
+                onSolicitarCamion = if (rol.puedeSolicitarCamion) {
+                    { mostrarCamion = true }
+                } else null,
+            )
+        }
+
+        composable(Rutas.SOLICITUDES) {
+            if (!rol.puedeVerSolicitudes) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+                return@composable
+            }
+            SolicitudesScreen(
+                solicitudes = solicitudesVisibles,
+                onVolver = { navController.popBackStack() },
+                onRevisar = if (rol.puedeAprobarCamion) {
+                    { id, aprobada -> viewModel.revisarSolicitud(id, aprobada, usuario.usuario) }
+                } else null,
+            )
+        }
+
+        composable(Rutas.DASHBOARD) {
+            if (!rol.puedeVerDashboard) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+                return@composable
+            }
+            val consumoSemana by remember { viewModel.consumoUltimosDias() }.collectAsState(initial = emptyList())
+            DashboardScreen(
+                silos = silos,
+                consumoSemana = consumoSemana,
+                solicitudesPendientes = pendientes,
+                onVolver = { navController.popBackStack() },
             )
         }
 
@@ -114,6 +192,11 @@ fun AppNavHost(
                 defaultValue = null
             }),
         ) { entrada ->
+            // Protección extra: aunque se llegue a la ruta, sin permiso se vuelve atrás
+            if (!rol.puedeGestionarSilos) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+                return@composable
+            }
             val idEditar = entrada.arguments?.getString(Rutas.ARG_SILO_ID)
             val esNuevo = idEditar == null
             var datosIniciales by remember { mutableStateOf<DatosSilo?>(null) }
@@ -139,6 +222,10 @@ fun AppNavHost(
             Rutas.MOVIMIENTO,
             arguments = listOf(navArgument(Rutas.ARG_SILO_ID) { type = NavType.StringType }),
         ) { entrada ->
+            if (!rol.puedeRegistrarMovimientos) {
+                LaunchedEffect(Unit) { navController.popBackStack() }
+                return@composable
+            }
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             var error by remember { mutableStateOf<String?>(null) }
 
@@ -196,15 +283,26 @@ fun AppNavHost(
 
         composable(Rutas.ESCANER) {
             QrScannerScreen(
-                // Operario: el QR abre directo el formulario de movimiento del silo
-                onCodigoEscaneado = { codigo ->
+                // Operario: el QR abre directo el formulario. Los demás roles: la ficha técnica
+                onCodigoEscaneado = { leido ->
+                    val codigo = leido.trim().uppercase()
                     scope.launch {
-                        if (viewModel.existeSilo(codigo)) {
-                            navController.navigate(Rutas.movimiento(codigo)) {
-                                popUpTo(Rutas.ESCANER) { inclusive = true }
+                        val existe = viewModel.existeSilo(codigo)
+                        val tieneAcceso = silos.any { it.id == codigo }
+                        when {
+                            !existe -> navController.popBackStack()
+                            !tieneAcceso -> {
+                                Toast.makeText(context, "No tienes acceso al silo $codigo", Toast.LENGTH_LONG).show()
+                                navController.popBackStack()
                             }
-                        } else {
-                            navController.popBackStack()
+                            else -> {
+                                val destino = if (rol.qrAbreFormulario && rol.puedeRegistrarMovimientos) {
+                                    Rutas.movimiento(codigo)
+                                } else {
+                                    Rutas.detalle(codigo)
+                                }
+                                navController.navigate(destino) { popUpTo(Rutas.ESCANER) { inclusive = true } }
+                            }
                         }
                     }
                 },

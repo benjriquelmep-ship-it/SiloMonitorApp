@@ -1,22 +1,32 @@
 package com.example.silomonitorapp.ui.screens
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -36,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.silomonitorapp.domain.Usuario
 import com.example.silomonitorapp.ui.components.AriztiaTopBar
 import com.example.silomonitorapp.ui.components.SiloCard
 import com.example.silomonitorapp.ui.components.color
@@ -50,7 +61,12 @@ fun SiloListScreen(
     onSiloClick: (SiloUi) -> Unit,
     onAbrirMapa: () -> Unit,
     onEscanearQr: () -> Unit,
-    onAgregarSilo: () -> Unit = {},
+    onAgregarSilo: (() -> Unit)? = null, // null: el rol no puede crear silos
+    usuario: Usuario? = null,
+    onCerrarSesion: () -> Unit = {},
+    onAbrirDashboard: (() -> Unit)? = null, // null: el rol no ve el dashboard
+    onAbrirSolicitudes: (() -> Unit)? = null, // null: el rol no ve la reposición
+    solicitudesPendientes: Int = 0,
 ) {
     var busqueda by rememberSaveable { mutableStateOf("") }
     var filtro by rememberSaveable { mutableStateOf<EstadoSilo?>(null) }
@@ -72,11 +88,18 @@ fun SiloListScreen(
             AriztiaTopBar(
                 titulo = "Monitoreo de Silos",
                 acciones = {
-                    IconButton(onClick = onAgregarSilo) {
-                        Icon(Icons.Filled.Add, contentDescription = "Agregar silo")
+                    if (onAgregarSilo != null) {
+                        IconButton(onClick = onAgregarSilo) {
+                            Icon(Icons.Filled.Add, contentDescription = "Agregar silo")
+                        }
                     }
                     IconButton(onClick = onAbrirMapa) {
                         Icon(Icons.Filled.Map, contentDescription = "Ver mapa")
+                    }
+                    if (usuario != null) {
+                        IconButton(onClick = onCerrarSesion) {
+                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Cerrar sesión")
+                        }
                     }
                 },
             )
@@ -97,6 +120,9 @@ fun SiloListScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            usuario?.let {
+                item { TarjetaUsuario(it, onAbrirDashboard, onAbrirSolicitudes, solicitudesPendientes) }
+            }
             item {
                 ResumenSemaforo(
                     silos = silos,
@@ -138,6 +164,63 @@ fun SiloListScreen(
                     onClick = { onSiloClick(silo) },
                     modifier = Modifier.animateItem(),
                 )
+            }
+        }
+    }
+}
+
+/** Quién está conectado, con qué rol y qué granjas puede ver. */
+@Composable
+private fun TarjetaUsuario(
+    usuario: Usuario,
+    onAbrirDashboard: (() -> Unit)?,
+    onAbrirSolicitudes: (() -> Unit)?,
+    solicitudesPendientes: Int,
+) {
+    Card(
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.AccountCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(usuario.nombre, fontWeight = FontWeight.SemiBold)
+                Text(
+                    usuario.alcance,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                usuario.rol.etiqueta,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small)
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+            }
+            if (onAbrirDashboard != null || onAbrirSolicitudes != null) {
+                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    onAbrirDashboard?.let {
+                        AssistChip(
+                            onClick = it,
+                            label = { Text("Dashboard") },
+                            leadingIcon = { Icon(Icons.Filled.BarChart, contentDescription = null) },
+                        )
+                    }
+                    onAbrirSolicitudes?.let {
+                        AssistChip(
+                            onClick = it,
+                            label = { Text(if (solicitudesPendientes > 0) "Reposición ($solicitudesPendientes)" else "Reposición") },
+                            leadingIcon = { Icon(Icons.Filled.LocalShipping, contentDescription = null) },
+                        )
+                    }
+                }
             }
         }
     }

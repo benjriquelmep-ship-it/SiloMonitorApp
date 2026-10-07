@@ -24,6 +24,11 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyBbf8wWxBI1M_dbI_uGyhqUnfCjViZVHqo" />
 
+        <!-- Descarga el modelo de lectura QR de Play Services al instalar la app -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode" />
+
         <!-- Permite que la app de cámara guarde la foto de evidencia en nuestro almacenamiento interno -->
         <provider
             android:name="androidx.core.content.FileProvider"

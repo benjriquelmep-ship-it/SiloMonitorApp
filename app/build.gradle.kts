@@ -72,14 +72,19 @@ dependencies {
     ksp("androidx.room:room-compiler:$roomVersion")
 
     // CameraX (Cámara para escaneo QR)
-    val cameraxVersion = "1.3.4"
+    val cameraxVersion = "1.6.2"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
     // Google ML Kit Barcode Scanning (Lector de QR)
-    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    // Versión que usa el modelo de Google Play Services: no incluye la librería nativa
+    // libbarhopper en el APK (compatible con páginas de 16 KB y APK más liviano)
+    implementation("com.google.android.gms:play-services-mlkit-barcode-scanning:18.3.1")
+
+    // Librería nativa alineada a 16 KB (la versión que traía Compose no lo estaba)
+    implementation("androidx.graphics:graphics-path:1.1.0")
 
     // Google Maps + GPS
     implementation("com.google.maps.android:maps-compose:6.4.1")
