@@ -100,17 +100,21 @@ fun MapaSilosScreen(
         position = CameraPosition.fromLatLngZoom(CENTRO_MELIPILLA, 10f)
     }
 
-    // Encuadra el silo enfocado o todos los silos cuando el mapa termina de cargar
+    // Encuadra el silo enfocado o todos los silos sin fallos por puntos únicos
     LaunchedEffect(mapaCargado, siloEnfocadoId) {
         if (!mapaCargado || silos.isEmpty()) return@LaunchedEffect
         val enfocado = silos.firstOrNull { it.id == siloEnfocadoId }
         if (enfocado != null) {
             camara.animate(CameraUpdateFactory.newLatLngZoom(LatLng(enfocado.latitud, enfocado.longitud), 16f))
+        } else if (silos.size == 1) {
+            camara.animate(CameraUpdateFactory.newLatLngZoom(LatLng(silos.first().latitud, silos.first().longitud), 15f))
         } else {
-            val limites = LatLngBounds.builder().apply {
-                silos.forEach { include(LatLng(it.latitud, it.longitud)) }
-            }.build()
-            camara.animate(CameraUpdateFactory.newLatLngBounds(limites, 120))
+            runCatching {
+                val limites = LatLngBounds.builder().apply {
+                    silos.forEach { include(LatLng(it.latitud, it.longitud)) }
+                }.build()
+                camara.animate(CameraUpdateFactory.newLatLngBounds(limites, 120))
+            }
         }
     }
 
@@ -130,7 +134,7 @@ fun MapaSilosScreen(
                             CameraUpdateFactory.newLatLngZoom(LatLng(ubicacion.latitude, ubicacion.longitude), 14f)
                         )
                     } else {
-                        snackbar.showSnackbar("No se pudo obtener la ubicación GPS")
+                        snackbar.showSnackbar("No se pudo obtener la ubicación GPS actual")
                     }
                 }
             }
@@ -165,6 +169,10 @@ fun MapaSilosScreen(
                         snippet = "${silo.estado.etiqueta} · Autonomía ${formatearAutonomia(silo.horasAutonomia)}",
                         icon = BitmapDescriptorFactory.defaultMarker(silo.estado.tonoMarcador),
                         onInfoWindowClick = { onSiloClick(silo) },
+                        onClick = {
+                            estado.showInfoWindow()
+                            false
+                        },
                     )
                 }
             }
