@@ -80,6 +80,7 @@ fun AppNavHost(
     val solicitudesVisibles = solicitudes.filter { it.siloId in idsVisibles }
     val pendientes = solicitudesVisibles.count { it.estado == EstadoSolicitud.PENDIENTE }
     val mensajeOperacion by viewModel.mensajeOperacion.collectAsState()
+    val sincronizando by viewModel.sincronizando.collectAsState()
 
     LaunchedEffect(mensajeOperacion) {
         mensajeOperacion?.let { mensaje ->
@@ -114,6 +115,8 @@ fun AppNavHost(
                     { navController.navigate(Rutas.SOLICITUDES) }
                 } else null,
                 solicitudesPendientes = pendientes,
+                sincronizando = sincronizando,
+                onSincronizar = { viewModel.sincronizarConFirestore() },
             )
         }
 
@@ -192,7 +195,6 @@ fun AppNavHost(
                 defaultValue = null
             }),
         ) { entrada ->
-            // Protección extra: aunque se llegue a la ruta, sin permiso se vuelve atrás
             if (!rol.puedeGestionarSilos) {
                 LaunchedEffect(Unit) { navController.popBackStack() }
                 return@composable
@@ -229,7 +231,6 @@ fun AppNavHost(
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             var error by remember { mutableStateOf<String?>(null) }
 
-            // Foto de evidencia: la cámara del sistema la guarda en el archivo que le entregamos
             var fotoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
             var uriEnCaptura by rememberSaveable { mutableStateOf<Uri?>(null) }
             val tomarFoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { guardada ->
@@ -282,7 +283,6 @@ fun AppNavHost(
 
         composable(Rutas.ESCANER) {
             QrScannerScreen(
-                // Operario: el QR abre directo el formulario. Los demás roles: la ficha técnica
                 onCodigoEscaneado = { leido ->
                     val codigo = leido.trim().uppercase()
                     scope.launch {
