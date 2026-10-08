@@ -31,4 +31,8 @@ interface SiloDao {
 
     @Query("UPDATE silos SET nivelActual = :nuevoNivel WHERE id = :id")
     fun actualizarNivel(id: String, nuevoNivel: Double): Int
+
+    @Query("SELECT * FROM silos")
+    fun obtenerTodosDirecto(): List<SiloEntity>
+
 }
