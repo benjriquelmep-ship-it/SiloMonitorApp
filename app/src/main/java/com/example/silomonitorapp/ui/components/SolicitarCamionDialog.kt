@@ -29,6 +29,7 @@ import com.example.silomonitorapp.domain.ReglasTerreno
 import com.example.silomonitorapp.domain.ValidadorFormularios
 import com.example.silomonitorapp.ui.model.EstadoSilo
 import com.example.silomonitorapp.ui.model.SiloUi
+import kotlin.math.floor
 
 /**
  * Coordinar reposición: el Supervisor pide un camión para el silo.
@@ -41,7 +42,8 @@ fun SolicitarCamionDialog(
     onDismiss: () -> Unit,
     onConfirmar: (kg: Double, urgente: Boolean, observacion: String) -> Unit,
 ) {
-    val sugeridos = ReglasTerreno.kgSugeridosReposicion(silo.stockActualKg, silo.capacidadMaxKg)
+    // Se redondea hacia abajo para que el texto, el valor sugerido y el error muestren lo mismo
+    val sugeridos = floor(ReglasTerreno.kgSugeridosReposicion(silo.stockActualKg, silo.capacidadMaxKg))
     var kgTexto by rememberSaveable { mutableStateOf(sugeridos.toLong().toString()) }
     var urgente by rememberSaveable { mutableStateOf(silo.estado == EstadoSilo.CRITICO) }
     var observacion by rememberSaveable { mutableStateOf("") }
