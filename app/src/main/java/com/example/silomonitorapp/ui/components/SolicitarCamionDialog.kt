@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.silomonitorapp.domain.ReglasTerreno
+import com.example.silomonitorapp.domain.ValidadorFormularios
 import com.example.silomonitorapp.ui.model.EstadoSilo
 import com.example.silomonitorapp.ui.model.SiloUi
 
@@ -43,7 +45,11 @@ fun SolicitarCamionDialog(
     var kgTexto by rememberSaveable { mutableStateOf(sugeridos.toLong().toString()) }
     var urgente by rememberSaveable { mutableStateOf(silo.estado == EstadoSilo.CRITICO) }
     var observacion by rememberSaveable { mutableStateOf("") }
-    val kg = kgTexto.replace(",", ".").toDoubleOrNull()
+    val kg = ValidadorFormularios.aNumero(kgTexto)
+    // Validación por campo en vivo: los kilos deben caber en el espacio libre del silo
+    val errorKilos = ValidadorFormularios.validarKilos(kgTexto, capacidadMaxima = sugeridos)
+    // Error del campo, o el que devuelve el repositorio al enviar (ej: ya hay un camión pendiente)
+    val errorCampo = errorKilos ?: error
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -60,7 +66,15 @@ fun SolicitarCamionDialog(
                     onValueChange = { kgTexto = it.filter { c -> c.isDigit() || c == '.' || c == ',' } },
                     label = { Text("Kilos a reponer") },
                     singleLine = true,
-                    isError = error != null,
+                    isError = errorCampo != null,
+                    trailingIcon = {
+                        if (errorCampo != null) {
+                            Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    supportingText = {
+                        if (errorCampo != null) Text(errorCampo, color = MaterialTheme.colorScheme.error)
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -82,15 +96,12 @@ fun SolicitarCamionDialog(
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
                 )
-                error?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = { kg?.let { onConfirmar(it, urgente, observacion) } },
-                enabled = kg != null && kg > 0,
+                enabled = kg != null && errorKilos == null,
             ) { Text("Enviar solicitud") }
         },
         dismissButton = {

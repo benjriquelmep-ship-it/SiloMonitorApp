@@ -1,6 +1,7 @@
 package com.example.silomonitorapp
 
 import com.example.silomonitorapp.domain.ValidadorFormularios
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -65,5 +66,36 @@ class ValidadorFormulariosTest {
     @Test
     fun validarKilos_valido_retornaNull() {
         assertNull(ValidadorFormularios.validarKilos("5000", capacidadMaxima = 20000.0))
+    }
+
+    @Test
+    fun numeros_aceptanComaDecimal() {
+        assertEquals(2500.5, ValidadorFormularios.aNumero("2500,5")!!, 0.0)
+        assertNull(ValidadorFormularios.validarCapacidad("2500,5"))
+        assertNull(ValidadorFormularios.validarCoordenada("-33,685", esLatitud = true))
+    }
+
+    @Test
+    fun validarCodigoSilo_rechazaEspaciosYSimbolos() {
+        assertNotNull(ValidadorFormularios.validarCodigoSilo("SIL 007"))
+        assertNotNull(ValidadorFormularios.validarCodigoSilo("SIL#7"))
+        assertNull(ValidadorFormularios.validarCodigoSilo("TOLVA-12"))
+    }
+
+    @Test
+    fun validarStock_noPuedeSuperarCapacidadNiSerNegativo() {
+        assertNotNull(ValidadorFormularios.validarStock("30000", "25000"))
+        assertNotNull(ValidadorFormularios.validarStock("-1", "25000"))
+        assertNotNull(ValidadorFormularios.validarStock("", "25000"))
+        assertNull(ValidadorFormularios.validarStock("25000", "25000"))
+    }
+
+    @Test
+    fun validarConsumoYGranja_obligatorios() {
+        assertNotNull(ValidadorFormularios.validarConsumo(""))
+        assertNotNull(ValidadorFormularios.validarConsumo("abc"))
+        assertNull(ValidadorFormularios.validarConsumo("1800"))
+        assertNotNull(ValidadorFormularios.validarObligatorio(" ", "La granja"))
+        assertNull(ValidadorFormularios.validarObligatorio("Granja El Paico", "La granja"))
     }
 }

@@ -1,5 +1,10 @@
 package com.example.silomonitorapp.ui.screens
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -18,14 +24,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,18 +44,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.silomonitorapp.domain.ValidadorFormularios
 import com.example.silomonitorapp.ui.model.DatosSilo
+import com.google.android.gms.location.LocationServices
+import java.util.Locale
 
 /**
- * Formulario de alta y edición de Silo adaptado al modelo DatosSilo original,
- * incorporando validación por campo individual con íconos y textos de soporte.
+ * Formulario de alta y edición de Silo con validación por campo individual
+ * (ícono de advertencia + texto de soporte). Las reglas viven en [ValidadorFormularios].
+ * Al editar, el código y el stock no se modifican: el stock solo cambia con movimientos.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,50 +72,101 @@ fun SiloFormScreen(
     onVolver: () -> Unit,
     onGuardar: (DatosSilo) -> Unit,
 ) {
-    var codigo by remember { mutableStateOf("") }
-    var nombre by remember { mutableStateOf("") }
-    var granja by remember { mutableStateOf("") }
-    var galpon by remember { mutableStateOf("") }
-    var tipoAlimento by remember { mutableStateOf("") }
-    var capacidadMax by remember { mutableStateOf("") }
-    var stockActual by remember { mutableStateOf("") }
-    var consumoPromedio by remember { mutableStateOf("500.0") }
-    var latitud by remember { mutableStateOf("-33.6850") }
-    var longitud by remember { mutableStateOf("-71.2150") }
+    val context = LocalContext.current
 
+    // rememberSaveable: los datos escritos se conservan al girar el teléfono
+    var codigo by rememberSaveable { mutableStateOf("") }
+    var nombre by rememberSaveable { mutableStateOf("") }
+    var granja by rememberSaveable { mutableStateOf("") }
+    var galpon by rememberSaveable { mutableStateOf("") }
+    var tipoAlimento by rememberSaveable { mutableStateOf("") }
+    var capacidadMax by rememberSaveable { mutableStateOf("") }
+    var stockActual by rememberSaveable { mutableStateOf("") }
+    var consumoPromedio by rememberSaveable { mutableStateOf("500") }
+    var latitud by rememberSaveable { mutableStateOf("-33.6850") }
+    var longitud by rememberSaveable { mutableStateOf("-71.2150") }
+    var precargado by rememberSaveable { mutableStateOf(false) }
+
+    var errorCodigo by rememberSaveable { mutableStateOf<String?>(null) }
+    var errorGranja by rememberSaveable { mutableStateOf<String?>(null) }
+    var errorCapacidad by rememberSaveable { mutableStateOf<String?>(null) }
+    var errorStockActual by rememberSaveable { mutableStateOf<String?>(null) }
+    var errorConsumo by rememberSaveable { mutableStateOf<String?>(null) }
+    var errorLatitud by rememberSaveable { mutableStateOf<String?>(null) }
+    var errorLongitud by rememberSaveable { mutableStateOf<String?>(null) }
+
+    var obteniendoUbicacion by rememberSaveable { mutableStateOf(false) }
+    var avisoUbicacion by rememberSaveable { mutableStateOf<String?>(null) }
+
+    // Al editar, precarga una sola vez los datos actuales del silo
     LaunchedEffect(datosIniciales) {
-        datosIniciales?.let {
-            codigo = it.codigo
-            nombre = it.nombre
-            granja = it.granja
-            galpon = it.galpon
-            tipoAlimento = it.tipoAlimento
-            capacidadMax = it.capacidadMaxKg.toString()
-            stockActual = it.stockActualKg.toString()
-            consumoPromedio = it.consumoPromedioDiarioKg.toString()
-            latitud = it.latitud.toString()
-            longitud = it.longitud.toString()
+        if (datosIniciales != null && !precargado) {
+            codigo = datosIniciales.codigo
+            nombre = datosIniciales.nombre
+            granja = datosIniciales.granja
+            galpon = datosIniciales.galpon
+            tipoAlimento = datosIniciales.tipoAlimento
+            capacidadMax = sinDecimales(datosIniciales.capacidadMaxKg)
+            stockActual = sinDecimales(datosIniciales.stockActualKg)
+            consumoPromedio = sinDecimales(datosIniciales.consumoPromedioDiarioKg)
+            latitud = datosIniciales.latitud.toString()
+            longitud = datosIniciales.longitud.toString()
+            precargado = true
         }
     }
 
-    var errorCodigo by remember { mutableStateOf<String?>(null) }
-    var errorCapacidad by remember { mutableStateOf<String?>(null) }
-    var errorStockActual by remember { mutableStateOf<String?>(null) }
-    var errorLatitud by remember { mutableStateOf<String?>(null) }
-    var errorLongitud by remember { mutableStateOf<String?>(null) }
-
     fun validarFormulario(): Boolean {
         errorCodigo = ValidadorFormularios.validarCodigoSilo(codigo)
+        errorGranja = ValidadorFormularios.validarObligatorio(granja, "La granja")
         errorCapacidad = ValidadorFormularios.validarCapacidad(capacidadMax)
-        errorStockActual = if (stockActual.isBlank()) "Ingrese stock inicial" else null
+        errorStockActual = ValidadorFormularios.validarStock(stockActual, capacidadMax)
+        errorConsumo = ValidadorFormularios.validarConsumo(consumoPromedio)
         errorLatitud = ValidadorFormularios.validarCoordenada(latitud, esLatitud = true)
         errorLongitud = ValidadorFormularios.validarCoordenada(longitud, esLatitud = false)
 
-        return errorCodigo == null &&
-                errorCapacidad == null &&
-                errorStockActual == null &&
-                errorLatitud == null &&
-                errorLongitud == null
+        return listOf(errorCodigo, errorGranja, errorCapacidad, errorStockActual, errorConsumo, errorLatitud, errorLongitud)
+            .all { it == null }
+    }
+
+    // --- GPS: completa latitud y longitud con la ubicación actual del teléfono ---
+    @SuppressLint("MissingPermission")
+    fun leerUbicacionActual() {
+        obteniendoUbicacion = true
+        avisoUbicacion = null
+        LocationServices.getFusedLocationProviderClient(context).lastLocation
+            .addOnSuccessListener { ubicacion ->
+                obteniendoUbicacion = false
+                if (ubicacion != null) {
+                    latitud = "%.6f".format(Locale.US, ubicacion.latitude)
+                    longitud = "%.6f".format(Locale.US, ubicacion.longitude)
+                    errorLatitud = null
+                    errorLongitud = null
+                } else {
+                    avisoUbicacion = "No se pudo obtener la ubicación. Activa el GPS e inténtalo de nuevo."
+                }
+            }
+            .addOnFailureListener {
+                obteniendoUbicacion = false
+                avisoUbicacion = "No se pudo obtener la ubicación."
+            }
+    }
+
+    val pedirPermisoUbicacion = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { resultado ->
+        if (resultado.values.any { it }) leerUbicacionActual()
+        else avisoUbicacion = "Se necesita permiso de ubicación para usar el GPS."
+    }
+
+    fun usarMiUbicacion() {
+        val tienePermiso = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        if (tienePermiso) leerUbicacionActual()
+        else pedirPermisoUbicacion.launch(
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+        )
     }
 
     Scaffold(
@@ -130,195 +196,113 @@ fun SiloFormScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        "Identificación",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    OutlinedTextField(
-                        value = codigo,
-                        onValueChange = {
-                            codigo = it
-                            errorCodigo = ValidadorFormularios.validarCodigoSilo(it)
-                        },
-                        label = { Text("Código de Silo (ej. SILO-01)") },
-                        enabled = esNuevo,
-                        isError = errorCodigo != null,
-                        trailingIcon = {
-                            if (errorCodigo != null) {
-                                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
-                            }
-                        },
-                        supportingText = {
-                            if (errorCodigo != null) {
-                                Text(errorCodigo.orEmpty(), color = MaterialTheme.colorScheme.error)
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = nombre,
-                        onValueChange = { nombre = it },
-                        label = { Text("Nombre descriptivo") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = granja,
-                        onValueChange = { granja = it },
-                        label = { Text("Granja o Sector") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = galpon,
-                        onValueChange = { galpon = it },
-                        label = { Text("Galpón") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = tipoAlimento,
-                        onValueChange = { tipoAlimento = it },
-                        label = { Text("Tipo de Alimento") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+            SeccionFormulario("Identificación") {
+                CampoValidado(
+                    valor = codigo,
+                    onCambio = {
+                        // Mayúsculas y sin espacios: es el mismo texto que lleva el QR del silo
+                        codigo = it.uppercase().filter { c -> c.isLetterOrDigit() || c == '-' }.take(20)
+                        errorCodigo = ValidadorFormularios.validarCodigoSilo(codigo)
+                    },
+                    etiqueta = "Código de Silo (ej. SIL-007)",
+                    error = errorCodigo,
+                    habilitado = esNuevo,
+                    mayusculas = true,
+                )
+                CampoValidado(valor = nombre, onCambio = { nombre = it }, etiqueta = "Nombre descriptivo")
+                CampoValidado(
+                    valor = granja,
+                    onCambio = {
+                        granja = it
+                        errorGranja = ValidadorFormularios.validarObligatorio(it, "La granja")
+                    },
+                    etiqueta = "Granja o Sector",
+                    error = errorGranja,
+                )
+                CampoValidado(valor = galpon, onCambio = { galpon = it }, etiqueta = "Galpón")
+                CampoValidado(valor = tipoAlimento, onCambio = { tipoAlimento = it }, etiqueta = "Tipo de Alimento")
             }
 
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            SeccionFormulario("Capacidades y Consumo") {
+                CampoValidado(
+                    valor = capacidadMax,
+                    onCambio = {
+                        capacidadMax = it
+                        errorCapacidad = ValidadorFormularios.validarCapacidad(it)
+                        // Al cambiar la capacidad se revisa de nuevo que el stock quepa
+                        if (stockActual.isNotBlank()) {
+                            errorStockActual = ValidadorFormularios.validarStock(stockActual, it)
+                        }
+                    },
+                    etiqueta = "Capacidad Máxima (kg)",
+                    error = errorCapacidad,
+                    numerico = true,
+                )
+                CampoValidado(
+                    valor = stockActual,
+                    onCambio = {
+                        stockActual = it
+                        errorStockActual = ValidadorFormularios.validarStock(it, capacidadMax)
+                    },
+                    etiqueta = if (esNuevo) "Stock Actual Inicial (kg)" else "Stock Actual (cambia con movimientos)",
+                    error = errorStockActual,
+                    habilitado = esNuevo,
+                    numerico = true,
+                )
+                CampoValidado(
+                    valor = consumoPromedio,
+                    onCambio = {
+                        consumoPromedio = it
+                        errorConsumo = ValidadorFormularios.validarConsumo(it)
+                    },
+                    etiqueta = "Consumo Promedio Diario (kg)",
+                    error = errorConsumo,
+                    numerico = true,
+                )
+            }
+
+            SeccionFormulario("Ubicación") {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    CampoValidado(
+                        valor = latitud,
+                        onCambio = {
+                            latitud = it
+                            errorLatitud = ValidadorFormularios.validarCoordenada(it, esLatitud = true)
+                        },
+                        etiqueta = "Latitud",
+                        error = errorLatitud,
+                        numerico = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    CampoValidado(
+                        valor = longitud,
+                        onCambio = {
+                            longitud = it
+                            errorLongitud = ValidadorFormularios.validarCoordenada(it, esLatitud = false)
+                        },
+                        etiqueta = "Longitud",
+                        error = errorLongitud,
+                        numerico = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                OutlinedButton(
+                    onClick = ::usarMiUbicacion,
+                    enabled = !obteniendoUbicacion,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
                 ) {
-                    Text(
-                        "Capacidades y Ubicación",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    OutlinedTextField(
-                        value = capacidadMax,
-                        onValueChange = {
-                            capacidadMax = it
-                            errorCapacidad = ValidadorFormularios.validarCapacidad(it)
-                        },
-                        label = { Text("Capacidad Máxima (kg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = errorCapacidad != null,
-                        trailingIcon = {
-                            if (errorCapacidad != null) {
-                                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
-                            }
-                        },
-                        supportingText = {
-                            if (errorCapacidad != null) {
-                                Text(errorCapacidad.orEmpty(), color = MaterialTheme.colorScheme.error)
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = stockActual,
-                        onValueChange = {
-                            stockActual = it
-                            errorStockActual = if (it.isBlank()) "Ingrese stock inicial" else null
-                        },
-                        label = { Text("Stock Actual Inicial (kg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        isError = errorStockActual != null,
-                        trailingIcon = {
-                            if (errorStockActual != null) {
-                                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
-                            }
-                        },
-                        supportingText = {
-                            if (errorStockActual != null) {
-                                Text(errorStockActual.orEmpty(), color = MaterialTheme.colorScheme.error)
-                            }
-                        },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    OutlinedTextField(
-                        value = consumoPromedio,
-                        onValueChange = { consumoPromedio = it },
-                        label = { Text("Consumo Promedio Diario (kg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = latitud,
-                            onValueChange = {
-                                latitud = it
-                                errorLatitud = ValidadorFormularios.validarCoordenada(it, esLatitud = true)
-                            },
-                            label = { Text("Latitud") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            isError = errorLatitud != null,
-                            trailingIcon = {
-                                if (errorLatitud != null) {
-                                    Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            supportingText = {
-                                if (errorLatitud != null) {
-                                    Text(errorLatitud.orEmpty(), color = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        OutlinedTextField(
-                            value = longitud,
-                            onValueChange = {
-                                longitud = it
-                                errorLongitud = ValidadorFormularios.validarCoordenada(it, esLatitud = false)
-                            },
-                            label = { Text("Longitud") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            isError = errorLongitud != null,
-                            trailingIcon = {
-                                if (errorLongitud != null) {
-                                    Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            supportingText = {
-                                if (errorLongitud != null) {
-                                    Text(errorLongitud.orEmpty(), color = MaterialTheme.colorScheme.error)
-                                }
-                            },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
+                    if (obteniendoUbicacion) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Filled.MyLocation, contentDescription = null)
                     }
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (obteniendoUbicacion) "Obteniendo ubicación..." else "Usar mi ubicación actual")
+                }
+                avisoUbicacion?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
 
@@ -339,11 +323,11 @@ fun SiloFormScreen(
                             granja = granja.trim(),
                             galpon = galpon.trim(),
                             tipoAlimento = tipoAlimento.trim(),
-                            capacidadMaxKg = capacidadMax.toDoubleOrNull() ?: 0.0,
-                            stockActualKg = stockActual.toDoubleOrNull() ?: 0.0,
-                            consumoPromedioDiarioKg = consumoPromedio.toDoubleOrNull() ?: 500.0,
-                            latitud = latitud.toDoubleOrNull() ?: 0.0,
-                            longitud = longitud.toDoubleOrNull() ?: 0.0,
+                            capacidadMaxKg = ValidadorFormularios.aNumero(capacidadMax) ?: 0.0,
+                            stockActualKg = ValidadorFormularios.aNumero(stockActual) ?: 0.0,
+                            consumoPromedioDiarioKg = ValidadorFormularios.aNumero(consumoPromedio) ?: 0.0,
+                            latitud = ValidadorFormularios.aNumero(latitud) ?: 0.0,
+                            longitud = ValidadorFormularios.aNumero(longitud) ?: 0.0,
                         )
                         onGuardar(datos)
                     }
@@ -360,3 +344,64 @@ fun SiloFormScreen(
         }
     }
 }
+
+/** Tarjeta blanca con título para agrupar campos relacionados. */
+@Composable
+private fun SeccionFormulario(titulo: String, contenido: @Composable () -> Unit) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            contenido()
+        }
+    }
+}
+
+/**
+ * Campo de texto con validación visual estándar: borde rojo, ícono de advertencia
+ * y mensaje de error debajo cuando [error] no es null.
+ */
+@Composable
+private fun CampoValidado(
+    valor: String,
+    onCambio: (String) -> Unit,
+    etiqueta: String,
+    error: String? = null,
+    habilitado: Boolean = true,
+    numerico: Boolean = false,
+    mayusculas: Boolean = false,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+) {
+    OutlinedTextField(
+        value = valor,
+        onValueChange = onCambio,
+        label = { Text(etiqueta) },
+        enabled = habilitado,
+        isError = error != null,
+        trailingIcon = {
+            if (error != null) {
+                Icon(Icons.Filled.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error)
+            }
+        },
+        supportingText = {
+            if (error != null) {
+                Text(error, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (numerico) KeyboardType.Decimal else KeyboardType.Text,
+            capitalization = if (mayusculas) KeyboardCapitalization.Characters else KeyboardCapitalization.Sentences,
+        ),
+        singleLine = true,
+        modifier = modifier,
+    )
+}
+
+private fun sinDecimales(valor: Double): String =
+    if (valor % 1.0 == 0.0) valor.toLong().toString() else valor.toString()
