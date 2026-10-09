@@ -8,8 +8,10 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 /**
  * Modelo de resultado esperado por SiloViewModel tras el proceso de sincronización.
@@ -22,6 +24,12 @@ data class ResultadoSync(
 )
 
 class SyncRepository(private val context: Context) {
+
+    private companion object {
+        // Sin internet, Firestore espera la confirmación del servidor para siempre:
+        // si no responde en este tiempo, se avisa y los registros siguen pendientes
+        const val TIEMPO_MAXIMO_MS = 15_000L
+    }
 
     private val db: FirebaseFirestore? by lazy {
         runCatching {
@@ -45,8 +53,9 @@ class SyncRepository(private val context: Context) {
         )
 
         runCatching {
+            withTimeout(TIEMPO_MAXIMO_MS) {
             var totalMovs = 0
-            val totalSols = 0
+            var totalSols = 0
 
             // 1. Obtener y subir silos actuales
             val silos = localDb.siloDao().obtenerTodosDirecto()
@@ -93,16 +102,46 @@ class SyncRepository(private val context: Context) {
                 totalMovs = idsExitosos.size
             }
 
+            // 3. Subir solicitudes de camión pendientes (nuevas, aprobadas o rechazadas)
+            val solicitudesPendientes = localDb.solicitudCamionDao().obtenerPendientesSincronizar()
+            if (solicitudesPendientes.isNotEmpty()) {
+                val idsExitosos = mutableListOf<Long>()
+                for (sol in solicitudesPendientes) {
+                    val datosSol = hashMapOf(
+                        "siloId" to sol.siloId,
+                        "kgSolicitados" to sol.kgSolicitados,
+                        "urgente" to sol.urgente,
+                        "observacion" to sol.observacion,
+                        "solicitadoPor" to sol.solicitadoPor,
+                        "fechaSolicitud" to sol.fechaSolicitud,
+                        "estado" to sol.estado,
+                        "revisadoPor" to sol.revisadoPor,
+                        "fechaRevision" to sol.fechaRevision
+                    )
+                    // Mismo documento al aprobar/rechazar: se actualiza en vez de duplicarse
+                    firestore.collection("solicitudes_camion")
+                        .document("${sol.siloId}_${sol.fechaSolicitud}")
+                        .set(datosSol)
+                        .await()
+                    idsExitosos.add(sol.id)
+                }
+                localDb.solicitudCamionDao().marcarComoSincronizadas(idsExitosos)
+                totalSols = idsExitosos.size
+            }
+
             ResultadoSync(
                 exitoso = true,
                 movimientosSincronizados = totalMovs,
                 solicitudesSincronizadas = totalSols
             )
+            }
         }.getOrElse { exception ->
-            ResultadoSync(
-                exitoso = false,
-                error = exception.localizedMessage ?: "Error desconocido durante la sincronización"
-            )
+            val mensaje = if (exception is TimeoutCancellationException) {
+                "Sin conexión con el servidor. Los registros siguen pendientes y se enviarán en la próxima sincronización."
+            } else {
+                exception.localizedMessage ?: "Error desconocido durante la sincronización"
+            }
+            ResultadoSync(exitoso = false, error = mensaje)
         }
     }
 
