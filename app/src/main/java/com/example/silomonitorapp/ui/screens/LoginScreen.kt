@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -49,20 +51,36 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.silomonitorapp.domain.ValidadorFormularios
 import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 
-/** Inicio de sesión. [onIngresar] devuelve el mensaje de error, o null si entró. */
+/** Inicio de sesión con validación por campo (IE 2.1.2) desacoplada en dominio (IE 2.2.1). */
 @Composable
 fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
     var usuario by rememberSaveable { mutableStateOf("") }
-    // La contraseña no se guarda al rotar la pantalla
     var clave by remember { mutableStateOf("") }
     var verClave by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+
+    var errorUsuario by remember { mutableStateOf<String?>(null) }
+    var errorClave by remember { mutableStateOf<String?>(null) }
+    var errorGeneral by remember { mutableStateOf<String?>(null) }
 
     fun ingresar() {
-        error = onIngresar(usuario, clave)
-        if (error != null) clave = ""
+        val errUser = ValidadorFormularios.validarUsuario(usuario)
+        val errPass = ValidadorFormularios.validarPassword(clave)
+
+        errorUsuario = errUser
+        errorClave = errPass
+
+        if (errUser != null || errPass != null) {
+            return
+        }
+
+        val resError = onIngresar(usuario, clave)
+        if (resError != null) {
+            errorGeneral = resError
+            clave = ""
+        }
     }
 
     Column(
@@ -72,7 +90,6 @@ fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
             .verticalScroll(rememberScrollState())
             .imePadding(),
     ) {
-        // Cabecera roja corporativa
         Column(
             Modifier
                 .fillMaxWidth()
@@ -109,7 +126,9 @@ fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
         }
 
         Card(
-            modifier = Modifier.padding(16.dp).padding(top = 8.dp),
+            modifier = Modifier
+                .padding(16.dp)
+                .padding(top = 8.dp),
             shape = MaterialTheme.shapes.medium,
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -117,42 +136,90 @@ fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text("Iniciar sesión", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
+                // Usuario con retroalimentación visual individual
                 OutlinedTextField(
                     value = usuario,
-                    onValueChange = { usuario = it; error = null },
+                    onValueChange = {
+                        usuario = it
+                        errorUsuario = null
+                        errorGeneral = null
+                    },
                     label = { Text("Usuario") },
                     leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                    trailingIcon = {
+                        if (errorUsuario != null) {
+                            Icon(
+                                Icons.Filled.Warning,
+                                contentDescription = "Error de validación",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    },
+                    supportingText = {
+                        if (errorUsuario != null) {
+                            Text(
+                                text = errorUsuario.orEmpty(),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    },
+                    isError = errorUsuario != null,
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                 )
 
+                // Contraseña con retroalimentación visual individual
                 OutlinedTextField(
                     value = clave,
-                    onValueChange = { clave = it; error = null },
+                    onValueChange = {
+                        clave = it
+                        errorClave = null
+                        errorGeneral = null
+                    },
                     label = { Text("Contraseña") },
                     leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
                     trailingIcon = {
-                        IconButton(onClick = { verClave = !verClave }) {
-                            Icon(
-                                if (verClave) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (verClave) "Ocultar contraseña" else "Mostrar contraseña",
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (errorClave != null) {
+                                Icon(
+                                    Icons.Filled.Warning,
+                                    contentDescription = "Error de validación",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(end = 4.dp)
+                                )
+                            }
+                            IconButton(onClick = { verClave = !verClave }) {
+                                Icon(
+                                    if (verClave) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (verClave) "Ocultar contraseña" else "Mostrar contraseña",
+                                )
+                            }
+                        }
+                    },
+                    supportingText = {
+                        if (errorClave != null) {
+                            Text(
+                                text = errorClave.orEmpty(),
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
                             )
                         }
                     },
                     visualTransformation = if (verClave) VisualTransformation.None else PasswordVisualTransformation(),
                     singleLine = true,
-                    isError = error != null,
+                    isError = errorClave != null || errorGeneral != null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { ingresar() }),
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.medium,
                 )
 
-                AnimatedVisibility(visible = error != null) {
+                AnimatedVisibility(visible = errorGeneral != null) {
                     Text(
-                        error.orEmpty(),
+                        errorGeneral.orEmpty(),
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -160,7 +227,9 @@ fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
 
                 Button(
                     onClick = ::ingresar,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
                     shape = MaterialTheme.shapes.medium,
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Login, contentDescription = null)
