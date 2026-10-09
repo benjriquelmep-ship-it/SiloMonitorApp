@@ -95,7 +95,7 @@ class ValidadorFormulariosTest {
         assertNotNull(ValidadorFormularios.validarConsumo(""))
         assertNotNull(ValidadorFormularios.validarConsumo("abc"))
         assertNull(ValidadorFormularios.validarConsumo("1800"))
-        assertNotNull(ValidadorFormularios.validarObligatorio(" ", "La granja"))
-        assertNull(ValidadorFormularios.validarObligatorio("Granja El Paico", "La granja"))
+        assertNotNull(ValidadorFormularios.validarObligatorio(" ", "La granja es obligatoria"))
+        assertNull(ValidadorFormularios.validarObligatorio("Granja El Paico", "La granja es obligatoria"))
     }
 }

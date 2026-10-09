@@ -27,9 +27,9 @@ object ValidadorFormularios {
         }
     }
 
-    /** Para campos de texto obligatorios como la granja. */
-    fun validarObligatorio(valor: String, nombreCampo: String): String? {
-        return if (valor.isBlank()) "$nombreCampo es obligatorio" else null
+    /** Para campos de texto obligatorios como la granja; [mensajeError] se muestra bajo el campo. */
+    fun validarObligatorio(valor: String, mensajeError: String): String? {
+        return if (valor.isBlank()) mensajeError else null
     }
 
     fun validarCapacidad(capacidadTexto: String): String? {

@@ -117,7 +117,7 @@ fun SiloFormScreen(
 
     fun validarFormulario(): Boolean {
         errorCodigo = ValidadorFormularios.validarCodigoSilo(codigo)
-        errorGranja = ValidadorFormularios.validarObligatorio(granja, "La granja")
+        errorGranja = ValidadorFormularios.validarObligatorio(granja, "La granja es obligatoria")
         errorCapacidad = ValidadorFormularios.validarCapacidad(capacidadMax)
         errorStockActual = ValidadorFormularios.validarStock(stockActual, capacidadMax)
         errorConsumo = ValidadorFormularios.validarConsumo(consumoPromedio)
@@ -214,7 +214,7 @@ fun SiloFormScreen(
                     valor = granja,
                     onCambio = {
                         granja = it
-                        errorGranja = ValidadorFormularios.validarObligatorio(it, "La granja")
+                        errorGranja = ValidadorFormularios.validarObligatorio(it, "La granja es obligatoria")
                     },
                     etiqueta = "Granja o Sector",
                     error = errorGranja,
