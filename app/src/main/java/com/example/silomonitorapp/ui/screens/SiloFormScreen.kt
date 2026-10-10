@@ -1,5 +1,11 @@
 package com.example.silomonitorapp.ui.screens
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -26,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -38,16 +46,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.silomonitorapp.domain.ValidadorFormularios
 import com.example.silomonitorapp.ui.model.DatosSilo
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 
-/**
- * Formulario de alta y edición de Silo adaptado al modelo DatosSilo original,
- * incorporando validación por campo individual con íconos y textos de soporte.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SiloFormScreen(
@@ -57,6 +66,9 @@ fun SiloFormScreen(
     onVolver: () -> Unit,
     onGuardar: (DatosSilo) -> Unit,
 ) {
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
     var codigo by remember { mutableStateOf("") }
     var nombre by remember { mutableStateOf("") }
     var granja by remember { mutableStateOf("") }
@@ -88,6 +100,59 @@ fun SiloFormScreen(
     var errorStockActual by remember { mutableStateOf<String?>(null) }
     var errorLatitud by remember { mutableStateOf<String?>(null) }
     var errorLongitud by remember { mutableStateOf<String?>(null) }
+
+    @SuppressLint("MissingPermission")
+    fun capturarGpsActual() {
+        val cts = CancellationTokenSource()
+        fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
+            .addOnSuccessListener { loc ->
+                if (loc != null) {
+                    latitud = loc.latitude.toString()
+                    longitud = loc.longitude.toString()
+                    errorLatitud = null
+                    errorLongitud = null
+                    Toast.makeText(context, "Ubicación GPS actualizada", Toast.LENGTH_SHORT).show()
+                } else {
+                    fusedLocationClient.lastLocation.addOnSuccessListener { ultima ->
+                        if (ultima != null) {
+                            latitud = ultima.latitude.toString()
+                            longitud = ultima.longitude.toString()
+                            errorLatitud = null
+                            errorLongitud = null
+                            Toast.makeText(context, "Ubicación aproximada obtenida", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Activa el GPS de tu celular para obtener la ubicación", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
+            }
+            .addOnFailureListener {
+                Toast.makeText(context, "Error al consultar el sensor GPS", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    val launcherPermisoGps = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { concedido ->
+        if (concedido) {
+            capturarGpsActual()
+        } else {
+            Toast.makeText(context, "Se necesita permiso de ubicación para capturar coordenadas", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun solicitarUbicacion() {
+        val tienePermiso = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (tienePermiso) {
+            capturarGpsActual()
+        } else {
+            launcherPermisoGps.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
 
     fun validarFormulario(): Boolean {
         errorCodigo = ValidadorFormularios.validarCodigoSilo(codigo)
@@ -318,6 +383,16 @@ fun SiloFormScreen(
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
+                    }
+
+                    OutlinedButton(
+                        onClick = { solicitarUbicacion() },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Icon(Icons.Filled.MyLocation, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Usar mi ubicación actual")
                     }
                 }
             }
