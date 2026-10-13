@@ -3,6 +3,7 @@ package com.example.silomonitorapp.ui.screens
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Location
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -56,6 +57,8 @@ import androidx.core.content.ContextCompat
 import com.example.silomonitorapp.domain.ValidadorFormularios
 import com.example.silomonitorapp.ui.model.DatosSilo
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import java.util.Locale
 
 /**
@@ -133,21 +136,35 @@ fun SiloFormScreen(
     fun leerUbicacionActual() {
         obteniendoUbicacion = true
         avisoUbicacion = null
-        LocationServices.getFusedLocationProviderClient(context).lastLocation
-            .addOnSuccessListener { ubicacion ->
-                obteniendoUbicacion = false
-                if (ubicacion != null) {
-                    latitud = "%.6f".format(Locale.US, ubicacion.latitude)
-                    longitud = "%.6f".format(Locale.US, ubicacion.longitude)
-                    errorLatitud = null
-                    errorLongitud = null
+        val cliente = LocationServices.getFusedLocationProviderClient(context)
+
+        fun aplicar(ubicacion: Location) {
+            latitud = "%.6f".format(Locale.US, ubicacion.latitude)
+            longitud = "%.6f".format(Locale.US, ubicacion.longitude)
+            errorLatitud = null
+            errorLongitud = null
+        }
+
+        // Primero pide una lectura nueva de alta precisión; si no llega, usa la última conocida
+        cliente.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, CancellationTokenSource().token)
+            .addOnSuccessListener { actual ->
+                if (actual != null) {
+                    obteniendoUbicacion = false
+                    aplicar(actual)
                 } else {
-                    avisoUbicacion = "No se pudo obtener la ubicación. Activa el GPS e inténtalo de nuevo."
+                    cliente.lastLocation.addOnSuccessListener { ultima ->
+                        obteniendoUbicacion = false
+                        if (ultima != null) aplicar(ultima)
+                        else avisoUbicacion = "No se pudo obtener la ubicación. Activa el GPS e inténtalo de nuevo."
+                    }.addOnFailureListener {
+                        obteniendoUbicacion = false
+                        avisoUbicacion = "No se pudo obtener la ubicación."
+                    }
                 }
             }
             .addOnFailureListener {
                 obteniendoUbicacion = false
-                avisoUbicacion = "No se pudo obtener la ubicación."
+                avisoUbicacion = "Error al consultar el sensor GPS."
             }
     }
 
