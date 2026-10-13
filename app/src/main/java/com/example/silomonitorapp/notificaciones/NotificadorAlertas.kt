@@ -19,6 +19,7 @@ object NotificadorAlertas {
 
     private const val CANAL_CRITICO = "silos_nivel_critico"
 
+    // Android 8+ exige un 'canal' para mostrar notificaciones. Se crea una vez al abrir la app.
     fun crearCanal(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val canal = NotificationChannel(
@@ -31,6 +32,8 @@ object NotificadorAlertas {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(canal)
     }
 
+    // Muestra la notificación de nivel crítico. Si no hay permiso, no hace nada.
+    // Al tocarla se abre la app (PendingIntent).
     fun notificarNivelCritico(context: Context, silo: SiloEntity) {
         val tienePermiso = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -38,6 +41,7 @@ object NotificadorAlertas {
 
         val porcentaje = (silo.nivelActual / silo.capacidadMaxima * 100).toInt()
 
+        // Acción al tocar la notificación: abrir MainActivity.
         val abrirApp = PendingIntent.getActivity(
             context,
             0,
@@ -45,6 +49,7 @@ object NotificadorAlertas {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        // Arma la notificación: ícono, título, texto y prioridad alta.
         val notificacion = NotificationCompat.Builder(context, CANAL_CRITICO)
             .setSmallIcon(android.R.drawable.stat_sys_warning)
             .setContentTitle("Nivel crítico: ${silo.nombre} ($porcentaje%)")

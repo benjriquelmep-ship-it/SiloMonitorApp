@@ -21,6 +21,7 @@ fun AriztiaTopBar(
     onVolver: (() -> Unit)? = null,
     acciones: @Composable RowScope.() -> Unit = {},
 ) {
+    // Barra de Material 3 con los colores corporativos; 'acciones' son los íconos de la derecha.
     TopAppBar(
         title = { Text(titulo, fontWeight = FontWeight.Bold) },
         navigationIcon = {

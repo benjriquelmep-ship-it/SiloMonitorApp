@@ -10,14 +10,17 @@ object ValidadorFormularios {
     /** Convierte texto a número aceptando coma o punto decimal (ej: "2500,5" o "2500.5"). */
     fun aNumero(texto: String): Double? = texto.trim().replace(",", ".").toDoubleOrNull()
 
+    // Login: el usuario no puede quedar vacío.
     fun validarUsuario(usuario: String): String? {
         return if (usuario.isBlank()) "El usuario es obligatorio" else null
     }
 
+    // Login: la contraseña no puede quedar vacía.
     fun validarPassword(password: String): String? {
         return if (password.isBlank()) "La contraseña es obligatoria" else null
     }
 
+    // Código del silo: obligatorio, solo letras, números y guiones.
     fun validarCodigoSilo(codigo: String): String? {
         return when {
             codigo.isBlank() -> "El código de silo es obligatorio"
@@ -32,6 +35,7 @@ object ValidadorFormularios {
         return if (valor.isBlank()) mensajeError else null
     }
 
+    // Capacidad máxima: obligatoria, numérica y mayor a 0.
     fun validarCapacidad(capacidadTexto: String): String? {
         val capacidad = aNumero(capacidadTexto)
         return when {
@@ -55,6 +59,7 @@ object ValidadorFormularios {
         }
     }
 
+    // Consumo diario: obligatorio, numérico y no negativo.
     fun validarConsumo(consumoTexto: String): String? {
         val consumo = aNumero(consumoTexto)
         return when {
@@ -65,6 +70,7 @@ object ValidadorFormularios {
         }
     }
 
+    // Latitud entre -90 y 90; longitud entre -180 y 180.
     fun validarCoordenada(valorTexto: String, esLatitud: Boolean): String? {
         val coord = aNumero(valorTexto) ?: return "Coordenada numérica inválida"
         return if (esLatitud && (coord < -90.0 || coord > 90.0)) {
@@ -76,6 +82,7 @@ object ValidadorFormularios {
         }
     }
 
+    // Kilos de un movimiento o camión: mayor a 0 y, si se indica, sin superar el máximo.
     fun validarKilos(kilosTexto: String, capacidadMaxima: Double? = null): String? {
         val kilos = aNumero(kilosTexto)
         return when {

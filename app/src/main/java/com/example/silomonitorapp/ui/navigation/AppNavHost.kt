@@ -41,6 +41,8 @@ import com.example.silomonitorapp.ui.screens.SolicitudesScreen
 import com.example.silomonitorapp.ui.viewmodel.SiloViewModel
 import kotlinx.coroutines.launch
 
+// Nombres de todas las pantallas (rutas). Las funciones arman la ruta con el id del silo,
+// por ejemplo detalle("SIL-001") = "detalle/SIL-001".
 object Rutas {
     const val ARG_SILO_ID = "siloId"
 
@@ -62,6 +64,9 @@ object Rutas {
 
 private const val DURACION_TRANSICION_MS = 350
 
+// NAVEGACIÓN: define qué pantalla se muestra en cada ruta y qué pasa al tocar cada botón.
+// También aplica los permisos por rol: si el rol no puede hacer algo, se pasa 'null'
+// y la pantalla oculta ese botón.
 @Composable
 fun AppNavHost(
     viewModel: SiloViewModel,
@@ -70,11 +75,14 @@ fun AppNavHost(
     navController: NavHostController = rememberNavController(),
 ) {
     val context = LocalContext.current
+    // Permite llamar funciones 'suspend' del ViewModel desde un botón.
     val scope = rememberCoroutineScope()
+    // collectAsState: observa el StateFlow; cuando cambia, la pantalla se redibuja sola.
     val todosLosSilos by viewModel.silosUi.collectAsState()
     // RBAC: cada usuario solo ve los silos de las granjas que tiene asignadas
     val silos = todosLosSilos.filter { usuario.puedeVerGranja(it.granja) }
     val rol = usuario.rol
+    // Las solicitudes también se filtran: cada rol solo ve las de sus silos.
     val idsVisibles = silos.map { it.id }.toSet()
     val solicitudes by viewModel.solicitudesUi.collectAsState()
     val solicitudesVisibles = solicitudes.filter { it.siloId in idsVisibles }
@@ -82,6 +90,7 @@ fun AppNavHost(
     val mensajeOperacion by viewModel.mensajeOperacion.collectAsState()
     val sincronizando by viewModel.sincronizando.collectAsState()
 
+    // Cada vez que el ViewModel deja un mensaje, se muestra como Toast y se limpia.
     LaunchedEffect(mensajeOperacion) {
         mensajeOperacion?.let { mensaje ->
             Toast.makeText(context, mensaje, Toast.LENGTH_LONG).show()
@@ -89,6 +98,8 @@ fun AppNavHost(
         }
     }
 
+    // NavHost: contenedor que cambia de pantalla. Las transiciones animan el deslizamiento
+    // hacia la izquierda al avanzar y hacia la derecha al volver.
     NavHost(
         navController = navController,
         startDestination = Rutas.LISTA,
@@ -97,6 +108,7 @@ fun AppNavHost(
         popEnterTransition = { slideIntoContainer(SlideDirection.End, tween(DURACION_TRANSICION_MS)) },
         popExitTransition = { slideOutOfContainer(SlideDirection.End, tween(DURACION_TRANSICION_MS)) },
     ) {
+        // Pantalla principal: lista de silos.
         composable(Rutas.LISTA) {
             SiloListScreen(
                 silos = silos,
@@ -125,8 +137,10 @@ fun AppNavHost(
             arguments = listOf(navArgument(Rutas.ARG_SILO_ID) { type = NavType.StringType }),
         ) { entrada ->
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
+            // Ficha del silo: lee el id desde la ruta y observa su historial.
             val movimientos by remember(id) { viewModel.historial(id) }.collectAsState(initial = emptyList())
             val silo = silos.firstOrNull { it.id == id }
+            // Controla si se ve el diálogo de solicitar camión.
             var mostrarCamion by rememberSaveable { mutableStateOf(false) }
             var errorCamion by remember { mutableStateOf<String?>(null) }
             if (mostrarCamion && silo != null) {
@@ -142,6 +156,7 @@ fun AppNavHost(
                     },
                 )
             }
+            // Si el rol no tiene permiso para una acción se pasa null y el botón no aparece.
             SiloDetailScreen(
                 silo = silo,
                 onVolver = { navController.popBackStack() },
@@ -159,6 +174,7 @@ fun AppNavHost(
             )
         }
 
+        // Bandeja de reposición (solicitudes de camión).
         composable(Rutas.SOLICITUDES) {
             if (!rol.puedeVerSolicitudes) {
                 LaunchedEffect(Unit) { navController.popBackStack() }
@@ -173,6 +189,7 @@ fun AppNavHost(
             )
         }
 
+        // Dashboard con indicadores y gráfico (Jefatura y Admin).
         composable(Rutas.DASHBOARD) {
             if (!rol.puedeVerDashboard) {
                 LaunchedEffect(Unit) { navController.popBackStack() }
@@ -195,10 +212,12 @@ fun AppNavHost(
                 defaultValue = null
             }),
         ) { entrada ->
+            // Protección extra: si se llega a la ruta sin permiso, vuelve atrás.
             if (!rol.puedeGestionarSilos) {
                 LaunchedEffect(Unit) { navController.popBackStack() }
                 return@composable
             }
+            // Sin id = silo nuevo; con id = editar ese silo (se cargan sus datos actuales).
             val idEditar = entrada.arguments?.getString(Rutas.ARG_SILO_ID)
             val esNuevo = idEditar == null
             var datosIniciales by remember { mutableStateOf<DatosSilo?>(null) }
@@ -231,6 +250,8 @@ fun AppNavHost(
             val id = entrada.arguments?.getString(Rutas.ARG_SILO_ID).orEmpty()
             var error by remember { mutableStateOf<String?>(null) }
 
+            // RECURSO NATIVO (cámara): fotoUri es la foto ya tomada; uriEnCaptura es el archivo
+            // que se le entrega a la app de cámara para que guarde ahí la foto.
             var fotoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
             var uriEnCaptura by rememberSaveable { mutableStateOf<Uri?>(null) }
             val tomarFoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { guardada ->
@@ -242,11 +263,13 @@ fun AppNavHost(
                     tomarFoto.launch(it)
                 }
             }
+            // Pide el permiso de cámara; si lo conceden, abre la cámara de inmediato.
             val pedirPermisoCamara = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
                 if (concedido) abrirCamara()
                 else Toast.makeText(context, "Se necesita la cámara para adjuntar la foto", Toast.LENGTH_LONG).show()
             }
 
+            // Al guardar: el ViewModel valida y guarda; si no hay error, vuelve a la ficha.
             MovimientoFormScreen(
                 silo = silos.firstOrNull { it.id == id },
                 error = error,
@@ -273,6 +296,7 @@ fun AppNavHost(
                 defaultValue = null
             }),
         ) { entrada ->
+            // Mapa con los silos visibles para el rol; si viene un id, centra el mapa en ese silo.
             MapaSilosScreen(
                 silos = silos,
                 siloEnfocadoId = entrada.arguments?.getString(Rutas.ARG_SILO_ID),
@@ -281,6 +305,7 @@ fun AppNavHost(
             )
         }
 
+        // Escáner QR: según el rol abre el formulario o la ficha del silo leído.
         composable(Rutas.ESCANER) {
             QrScannerScreen(
                 onCodigoEscaneado = { leido ->

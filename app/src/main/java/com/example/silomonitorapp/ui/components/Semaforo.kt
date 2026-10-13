@@ -22,6 +22,7 @@ import com.example.silomonitorapp.ui.theme.SemaforoCritico
 import com.example.silomonitorapp.ui.theme.SemaforoNormal
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 
+// Color de cada estado del semáforo (función de extensión sobre EstadoSilo).
 val EstadoSilo.color: Color
     get() = when (this) {
         EstadoSilo.NORMAL -> SemaforoNormal
@@ -37,6 +38,8 @@ val EstadoSilo.tonoMarcador: Float
         EstadoSilo.CRITICO -> BitmapDescriptorFactory.HUE_RED
     }
 
+// Etiqueta con punto de color y texto del estado (Normal / Advertencia / Crítico).
+// El texto evita depender solo del color (accesibilidad).
 @Composable
 fun EstadoBadge(estado: EstadoSilo, modifier: Modifier = Modifier) {
     Row(

@@ -23,12 +23,17 @@ import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 import com.example.silomonitorapp.ui.viewmodel.SesionViewModel
 import com.example.silomonitorapp.ui.viewmodel.SiloViewModel
 
+// Única Activity de la app (Compose maneja todas las pantallas).
+// Decide si mostrar el Login o la app según haya una sesión iniciada.
 class MainActivity : ComponentActivity() {
 
+    // ViewModel principal: silos, movimientos, solicitudes y sincronización.
+    // 'by viewModels' lo conserva aunque se gire la pantalla.
     private val viewModel: SiloViewModel by viewModels {
         SiloViewModel.Factory(application)
     }
 
+    // ViewModel de sesión: quién está conectado (login / logout).
     private val sesionViewModel: SesionViewModel by viewModels {
         SesionViewModel.Factory(application)
     }
@@ -37,6 +42,7 @@ class MainActivity : ComponentActivity() {
     private val solicitarPermisoNotificaciones =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    // Punto de entrada: prepara el canal de notificaciones, pide permiso y dibuja la UI.
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         NotificadorAlertas.crearCanal(this)
@@ -67,6 +73,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // Android 13+ exige pedir permiso para mostrar notificaciones.
     private fun pedirPermisoNotificaciones() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED

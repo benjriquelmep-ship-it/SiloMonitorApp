@@ -3,6 +3,7 @@ package com.example.silomonitorapp.data.local
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+// Entidad Room: cada objeto es una fila de la tabla 'silos'.
 @Entity(tableName = "silos")
 data class SiloEntity(
     @PrimaryKey

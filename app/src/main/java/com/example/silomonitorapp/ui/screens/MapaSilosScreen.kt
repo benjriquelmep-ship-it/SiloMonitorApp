@@ -61,8 +61,11 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.launch
 
+// Punto inicial del mapa antes de encuadrar los silos.
 private val CENTRO_MELIPILLA = LatLng(-33.69, -71.10)
 
+// PANTALLA mapa (RECURSO NATIVO: Google Maps + GPS).
+// Cada silo es un marcador con el color de su semáforo.
 @Composable
 fun MapaSilosScreen(
     silos: List<SiloUi>,
@@ -73,15 +76,18 @@ fun MapaSilosScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
+    // ESTADO: filtro 'solo críticos' y si el mapa ya terminó de cargar.
     var soloCriticos by rememberSaveable { mutableStateOf(false) }
     var mapaCargado by remember { mutableStateOf(false) }
 
+    // ¿El usuario ya dio permiso de ubicación?
     fun tienePermiso() = ContextCompat.checkSelfPermission(
         context, Manifest.permission.ACCESS_FINE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED || ContextCompat.checkSelfPermission(
         context, Manifest.permission.ACCESS_COARSE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
 
+    // Permiso de ubicación: se revisa al entrar y se pide si falta.
     var permisoUbicacion by remember { mutableStateOf(tienePermiso()) }
     val solicitarPermiso = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -95,7 +101,9 @@ fun MapaSilosScreen(
         }
     }
 
+    // Silos a dibujar según el filtro.
     val visibles = if (soloCriticos) silos.filter { it.estado != EstadoSilo.NORMAL } else silos
+    // Posición de la cámara del mapa (centro y zoom).
     val camara = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(CENTRO_MELIPILLA, 10f)
     }
@@ -118,6 +126,7 @@ fun MapaSilosScreen(
         }
     }
 
+    // Mueve el mapa a la ubicación actual del teléfono (pide permiso si falta).
     @SuppressLint("MissingPermission")
     fun centrarEnMiUbicacion() {
         if (!tienePermiso()) {
@@ -154,6 +163,7 @@ fun MapaSilosScreen(
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
+            // Mapa de Google con un marcador por silo teñido según su semáforo.
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = camara,
@@ -195,6 +205,7 @@ fun MapaSilosScreen(
     }
 }
 
+// Leyenda con los colores del semáforo sobre el mapa.
 @Composable
 private fun LeyendaSemaforo() {
     Card(

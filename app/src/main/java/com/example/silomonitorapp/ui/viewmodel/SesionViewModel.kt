@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+// VIEWMODEL de sesión: guarda quién está conectado y lo expone a la UI con StateFlow.
+// MainActivity lo observa: si 'usuario' es null muestra el Login, si no, la app.
 class SesionViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = SesionRepository(application)
@@ -27,11 +29,13 @@ class SesionViewModel(application: Application) : AndroidViewModel(application) 
         return null
     }
 
+    // Cierra la sesión: al quedar 'usuario' en null, la UI vuelve sola al Login.
     fun cerrarSesion() {
         repository.cerrarSesion()
         _usuario.value = null
     }
 
+    // Factory: le dice a Android cómo crear este ViewModel (necesita el Application).
     class Factory(private val application: Application) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {

@@ -58,6 +58,8 @@ import com.example.silomonitorapp.ui.model.SiloUi
 import com.example.silomonitorapp.ui.model.silosDemo
 import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 
+// PANTALLA principal: lista de silos con filtros del semáforo y buscador.
+// Recibe los datos ya filtrados por rol y avisa con callbacks (onSiloClick, onAbrirMapa...).
 @Composable
 fun SiloListScreen(
     silos: List<SiloUi>,
@@ -73,9 +75,11 @@ fun SiloListScreen(
     sincronizando: Boolean = false,
     onSincronizar: () -> Unit = {},
 ) {
+    // ESTADO: texto del buscador y filtro del semáforo seleccionado.
     var busqueda by rememberSaveable { mutableStateOf("") }
     var filtro by rememberSaveable { mutableStateOf<EstadoSilo?>(null) }
 
+    // Aplica el filtro y la búsqueda, y ordena: los críticos primero.
     val visibles = silos
         .filter { filtro == null || it.estado == filtro }
         .filter {
@@ -133,6 +137,7 @@ fun SiloListScreen(
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
+        // LazyColumn: lista eficiente que solo dibuja las tarjetas visibles en pantalla.
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp),
@@ -176,6 +181,7 @@ fun SiloListScreen(
                     }
                 }
             }
+            // animateItem(): ANIMACIÓN al reordenar o filtrar la lista.
             items(visibles, key = { it.id }) { silo ->
                 SiloCard(
                     silo = silo,
@@ -244,6 +250,7 @@ private fun TarjetaUsuario(
     }
 }
 
+// Chips con cuántos silos hay en cada estado; al tocarlos filtran la lista.
 @Composable
 private fun ResumenSemaforo(
     silos: List<SiloUi>,

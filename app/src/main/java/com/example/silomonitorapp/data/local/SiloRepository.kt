@@ -5,18 +5,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
+// REPOSITORY (patrón MVVM): único punto de acceso a los datos de silos.
+// El ViewModel nunca habla con Room directamente, siempre pasa por aquí.
+// Todas las funciones 'suspend' corren en Dispatchers.IO para no congelar la pantalla.
 class SiloRepository(private val db: AppDatabase) {
 
+    // Los DAO de cada tabla (las consultas SQL).
     private val siloDao = db.siloDao()
     private val movimientoDao = db.movimientoDao()
     private val solicitudDao = db.solicitudCamionDao()
 
+    // Flujo reactivo con todos los silos: cuando Room cambia, emite la lista nueva.
     val silosFlow: Flow<List<SiloEntity>> = siloDao.obtenerTodosLosSilos()
 
+    // Historial de movimientos de un silo (para la ficha).
     fun historialFlow(siloId: String): Flow<List<MovimientoEntity>> = movimientoDao.obtenerPorSilo(siloId)
 
+    // Movimientos desde una fecha (para el gráfico del dashboard).
     fun movimientosDesdeFlow(desde: Long): Flow<List<MovimientoEntity>> = movimientoDao.obtenerDesde(desde)
 
+    // Todas las solicitudes de camión (para la bandeja de reposición).
     val solicitudesFlow: Flow<List<SolicitudCamionEntity>> = solicitudDao.obtenerTodas()
 
     // Coordinar reposición: el Supervisor pide un camión para un silo
@@ -27,13 +35,17 @@ class SiloRepository(private val db: AppDatabase) {
         observacion: String,
         solicitadoPor: String
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        // 1) El silo debe existir.
         val silo = siloDao.obtenerSiloPorId(siloId)
             ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
+        // 2) Los kilos pedidos deben caber en el silo.
         ReglasTerreno.validarSolicitudCamion(silo.nivelActual, silo.capacidadMaxima, kgSolicitados)
             ?.let { return@withContext Result.failure(Exception(it)) }
+        // 3) No se permite un segundo camión si ya hay uno pendiente.
         if (solicitudDao.contarPendientesDeSilo(siloId) > 0) {
             return@withContext Result.failure(Exception("Ya hay un camión pendiente de aprobación para este silo."))
         }
+        // 4) Se guarda la solicitud (queda PENDIENTE y pendiente de sincronizar).
         solicitudDao.insertar(
             SolicitudCamionEntity(
                 siloId = siloId,
@@ -48,11 +60,13 @@ class SiloRepository(private val db: AppDatabase) {
 
     // La Jefatura aprueba o rechaza una solicitud pendiente
     suspend fun revisarSolicitud(id: Long, aprobada: Boolean, revisadoPor: String): Result<Unit> = withContext(Dispatchers.IO) {
+        // Solo cambia solicitudes PENDIENTES; si devuelve 0 filas, ya había sido revisada.
         val estado = if (aprobada) SolicitudCamionEntity.ESTADO_APROBADA else SolicitudCamionEntity.ESTADO_RECHAZADA
         val filas = solicitudDao.revisar(id, estado, revisadoPor, System.currentTimeMillis())
         if (filas == 0) Result.failure(Exception("La solicitud ya fue revisada.")) else Result.success(Unit)
     }
 
+    // Busca un silo por código en un hilo de fondo.
     suspend fun obtenerSiloPorId(id: String): SiloEntity? = withContext(Dispatchers.IO) {
         siloDao.obtenerSiloPorId(id)
     }
@@ -66,9 +80,11 @@ class SiloRepository(private val db: AppDatabase) {
         observacion: String = "",
         fotoUri: String? = null
     ): Result<SiloEntity> = withContext(Dispatchers.IO) {
+        // 1) Busca el silo.
         val silo = siloDao.obtenerSiloPorId(idSilo)
             ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
 
+        // 2) Calcula el nuevo stock aplicando las reglas; si no cumple, devuelve el error.
         val nuevoNivel = ReglasTerreno.calcularNuevoNivel(silo.nivelActual, silo.capacidadMaxima, cantidadKg, esCarga)
             .getOrElse { return@withContext Result.failure(it) }
 
@@ -85,11 +101,13 @@ class SiloRepository(private val db: AppDatabase) {
                 )
             )
         }
+        // Devuelve el silo con el stock nuevo (el ViewModel lo usa para la alerta crítica).
         Result.success(silo.copy(nivelActual = nuevoNivel))
     }
 
     // Alta manual de un silo nuevo (respaldo ante fallas del QR y alta de infraestructura)
     suspend fun crearSilo(silo: SiloEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        // No se permiten códigos repetidos.
         if (siloDao.obtenerSiloPorId(silo.id) != null) {
             return@withContext Result.failure(Exception("Ya existe un silo con el código ${silo.id}."))
         }
@@ -99,6 +117,7 @@ class SiloRepository(private val db: AppDatabase) {
 
     // Edita los datos maestros; el stock se conserva porque solo cambia con movimientos
     suspend fun editarSilo(silo: SiloEntity): Result<Unit> = withContext(Dispatchers.IO) {
+        // Se lee el silo actual para conservar su stock real.
         val actual = siloDao.obtenerSiloPorId(silo.id)
             ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
         if (actual.nivelActual > silo.capacidadMaxima) {
@@ -110,6 +129,7 @@ class SiloRepository(private val db: AppDatabase) {
 
     // Datos semilla iniciales coincidentes con la UI de Ariztía (cada silo con su propia ubicación)
     suspend fun precargarSilosSiEstaVacio() = withContext(Dispatchers.IO) {
+        // Solo carga los 6 silos de ejemplo la primera vez (tabla vacía).
         if (siloDao.contarSilos() > 0) return@withContext
 
         val silosIniciales = listOf(

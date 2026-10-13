@@ -63,9 +63,11 @@ fun MovimientoFormScreen(
     onAdjuntarFoto: () -> Unit,
     fotoUri: Uri? = null,
 ) {
+    // ESTADO del formulario: tipo (Carga/Consumo), kilos y observación.
     var tipo by rememberSaveable { mutableStateOf(TipoMovimiento.CARGA) }
     var kgTexto by rememberSaveable { mutableStateOf("") }
     var observacion by rememberSaveable { mutableStateOf("") }
+    // Convierte el texto a número (acepta coma); null si no es válido.
     val kg = kgTexto.replace(",", ".").toDoubleOrNull()
 
     Scaffold(

@@ -44,6 +44,7 @@ fun SolicitarCamionDialog(
 ) {
     // Se redondea hacia abajo para que el texto, el valor sugerido y el error muestren lo mismo
     val sugeridos = floor(ReglasTerreno.kgSugeridosReposicion(silo.stockActualKg, silo.capacidadMaxKg))
+    // ESTADO del diálogo: kilos (sugeridos por defecto), urgencia y observación.
     var kgTexto by rememberSaveable { mutableStateOf(sugeridos.toLong().toString()) }
     var urgente by rememberSaveable { mutableStateOf(silo.estado == EstadoSilo.CRITICO) }
     var observacion by rememberSaveable { mutableStateOf("") }
