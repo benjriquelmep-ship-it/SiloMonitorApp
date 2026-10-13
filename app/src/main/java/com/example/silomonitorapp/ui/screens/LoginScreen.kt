@@ -57,6 +57,8 @@ import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 /** Inicio de sesión con validación por campo (IE 2.1.2) desacoplada en dominio (IE 2.2.1). */
 @Composable
 fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
+    // ESTADO de la pantalla: lo que escribe el usuario y los errores de cada campo.
+    // 'remember' guarda el valor entre redibujos; 'rememberSaveable' además sobrevive al girar.
     var usuario by rememberSaveable { mutableStateOf("") }
     var clave by remember { mutableStateOf("") }
     var verClave by remember { mutableStateOf(false) }
@@ -65,7 +67,9 @@ fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
     var errorClave by remember { mutableStateOf<String?>(null) }
     var errorGeneral by remember { mutableStateOf<String?>(null) }
 
+    // Valida los campos; si están bien, intenta iniciar sesión con el ViewModel.
     fun ingresar() {
+        // 1) Valida cada campo por separado (la lógica está en ValidadorFormularios).
         val errUser = ValidadorFormularios.validarUsuario(usuario)
         val errPass = ValidadorFormularios.validarPassword(clave)
 
@@ -76,6 +80,7 @@ fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
             return
         }
 
+        // 2) Si los campos están completos, intenta iniciar sesión; si falla, muestra el error.
         val resError = onIngresar(usuario, clave)
         if (resError != null) {
             errorGeneral = resError
@@ -217,6 +222,7 @@ fun LoginScreen(onIngresar: (usuario: String, clave: String) -> String?) {
                     shape = MaterialTheme.shapes.medium,
                 )
 
+                // ANIMACIÓN: el mensaje de error aparece y desaparece suavemente.
                 AnimatedVisibility(visible = errorGeneral != null) {
                     Text(
                         errorGeneral.orEmpty(),

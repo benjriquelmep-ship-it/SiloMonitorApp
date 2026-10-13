@@ -31,6 +31,8 @@ class SyncRepository(private val context: Context) {
         const val TIEMPO_MAXIMO_MS = 15_000L
     }
 
+    // Conexión a Firestore. 'by lazy' la crea recién la primera vez que se usa;
+    // si Firebase no está configurado queda null y la app sigue funcionando offline.
     private val db: FirebaseFirestore? by lazy {
         runCatching {
             if (FirebaseApp.getApps(context).isEmpty()) {
@@ -40,6 +42,7 @@ class SyncRepository(private val context: Context) {
         }.getOrNull()
     }
 
+    // Base de datos local de donde se leen los registros pendientes.
     private val localDb by lazy { AppDatabase.obtenerBaseDatos(context) }
 
     /**

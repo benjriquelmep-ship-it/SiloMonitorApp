@@ -13,6 +13,7 @@ object UsuariosDemo {
 
     private data class Cuenta(val usuario: Usuario, val hashClave: String)
 
+    // Un usuario por rol. El segundo valor es el hash SHA-256 de la contraseña.
     private val cuentas = listOf(
         Cuenta(
             Usuario("operario", "Operario El Paico", Rol.OPERARIO, granjasPermitidas = setOf("Granja El Paico")),
@@ -34,12 +35,15 @@ object UsuariosDemo {
 
     /** Devuelve el usuario si el nombre y la contraseña coinciden, o null si no. */
     fun autenticar(usuario: String, clave: String): Usuario? {
+        // Busca el usuario (sin importar mayúsculas ni espacios) y compara el hash de la clave.
         val cuenta = cuentas.firstOrNull { it.usuario.usuario == usuario.trim().lowercase() } ?: return null
         return cuenta.usuario.takeIf { sha256(clave) == cuenta.hashClave }
     }
 
+    // Busca un usuario por nombre (se usa al restaurar la sesión guardada).
     fun buscar(usuario: String): Usuario? = cuentas.firstOrNull { it.usuario.usuario == usuario }?.usuario
 
+    // Convierte la contraseña en un hash SHA-256 para compararla sin guardarla en texto plano.
     internal fun sha256(texto: String): String =
         MessageDigest.getInstance("SHA-256").digest(texto.toByteArray())
             .joinToString("") { "%02x".format(it) }

@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
+// MATERIAL DESIGN 3: paleta de colores de la app (identidad Ariztía).
 private val LightColorScheme = lightColorScheme(
     primary = RojoAriztia,
     onPrimary = Color.White,

@@ -82,6 +82,7 @@ fun SolicitudesScreen(
 
 private val formatoFecha = SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag("es-CL"))
 
+// Tarjeta de una solicitud: silo, kilos, estado y botones Aprobar/Rechazar si corresponde.
 @Composable
 private fun TarjetaSolicitud(
     solicitud: SolicitudUi,
@@ -159,6 +160,7 @@ private val EstadoSolicitud.color: Color
         EstadoSolicitud.RECHAZADA -> SemaforoCritico
     }
 
+// Etiqueta de color para el estado o la urgencia.
 @Composable
 private fun Etiqueta(texto: String, color: Color) {
     Text(

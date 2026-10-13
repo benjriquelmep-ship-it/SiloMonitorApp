@@ -43,6 +43,7 @@ import java.io.File
 
 /** Crea un archivo vacío para que la cámara guarde ahí la foto de evidencia. */
 fun crearUriFotoEvidencia(context: Context): Uri {
+    // Carpeta privada de la app; FileProvider da un permiso temporal a la cámara para escribir ahí.
     val carpeta = File(context.filesDir, "evidencias").apply { mkdirs() }
     val archivo = File(carpeta, "evidencia_${System.currentTimeMillis()}.jpg")
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", archivo)
@@ -52,9 +53,11 @@ fun crearUriFotoEvidencia(context: Context): Uri {
 @Composable
 fun MiniaturaFoto(uri: Uri, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    // ESTADO: si la foto se está cargando y si se abrió en pantalla completa.
     var cargando by remember(uri) { mutableStateOf(true) }
     var mostrarDialogo by remember { mutableStateOf(false) }
 
+    // Carga la imagen en un hilo de fondo (Dispatchers.IO) para no trabar la pantalla.
     val bitmap by produceState<Bitmap?>(initialValue = null, uri) {
         cargando = true
         value = withContext(Dispatchers.IO) { decodificarReducida(context, uri, ladoMaximo = 800) }
@@ -70,6 +73,7 @@ fun MiniaturaFoto(uri: Uri, modifier: Modifier = Modifier) {
             .clickable(enabled = bitmap != null) { mostrarDialogo = true },
         contentAlignment = Alignment.Center,
     ) {
+        // Muestra: indicador de carga, la foto, o un ícono si no se pudo leer.
         when {
             cargando -> {
                 CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
@@ -94,6 +98,7 @@ fun MiniaturaFoto(uri: Uri, modifier: Modifier = Modifier) {
     }
 
     if (mostrarDialogo && bitmap != null) {
+        // Al tocar la miniatura se abre la foto completa en un diálogo.
         Dialog(onDismissRequest = { mostrarDialogo = false }) {
             Box(
                 modifier = Modifier
@@ -121,10 +126,12 @@ fun MiniaturaFoto(uri: Uri, modifier: Modifier = Modifier) {
     }
 }
 
+// Lee la foto en tamaño reducido (máx. ladoMaximo px) para no gastar memoria.
 private fun decodificarReducida(context: Context, uri: Uri, ladoMaximo: Int): Bitmap? = runCatching {
     val limites = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, limites) }
 
+    // Reduce la imagen a la mitad las veces necesarias hasta que quepa en ladoMaximo.
     var muestra = 1
     while (limites.outWidth / muestra > ladoMaximo || limites.outHeight / muestra > ladoMaximo) muestra *= 2
 

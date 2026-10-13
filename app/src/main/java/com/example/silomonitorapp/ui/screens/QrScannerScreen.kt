@@ -55,12 +55,15 @@ import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
+// PANTALLA escáner QR (RECURSO NATIVO: cámara). Pide el permiso de cámara
+// y muestra la vista previa; cuando lee un código llama a onCodigoEscaneado.
 @Composable
 fun QrScannerScreen(
     onCodigoEscaneado: (String) -> Unit,
     onVolver: () -> Unit
 ) {
     val context = LocalContext.current
+    // Permiso de cámara: si no está concedido, se pide al abrir la pantalla.
     var tienePermiso by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -164,14 +167,19 @@ fun QrScannerScreen(
     }
 }
 
+// Vista previa de la cámara con CameraX. Cada imagen se analiza con ML Kit
+// para detectar códigos QR.
 @androidx.annotation.OptIn(ExperimentalGetImage::class)
 @Composable
 fun CameraPreviewConMlKit(
     onQrDetectado: (String) -> Unit
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    // Hilo aparte para analizar imágenes sin trabar la pantalla.
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    // Lector de códigos de ML Kit.
     val barcodeScanner = remember { BarcodeScanning.getClient() }
+    // Evita leer el mismo QR varias veces seguidas.
     val escaneadoCompletado = remember { AtomicBoolean(false) }
 
     // Liberación estricta de hilos y clientes nativos al salir de la pantalla
@@ -182,6 +190,7 @@ fun CameraPreviewConMlKit(
         }
     }
 
+    // AndroidView: permite usar la vista de cámara (PreviewView, que no es Compose) dentro de Compose.
     AndroidView(
         factory = { ctx ->
             val previewView = PreviewView(ctx)
@@ -193,6 +202,7 @@ fun CameraPreviewConMlKit(
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
 
+                // Analiza cada cuadro de la cámara; KEEP_ONLY_LATEST descarta cuadros viejos.
                 val imageAnalysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -225,6 +235,7 @@ fun CameraPreviewConMlKit(
                 }
 
                 try {
+                    // Conecta la cámara trasera a la vista previa y al análisis, ligada al ciclo de vida.
                     cameraProvider.unbindAll()
                     cameraProvider.bindToLifecycle(
                         lifecycleOwner,

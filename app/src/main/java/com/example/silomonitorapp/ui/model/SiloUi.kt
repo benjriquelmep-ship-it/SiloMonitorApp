@@ -30,6 +30,7 @@ data class SiloUi(
         get() = ReglasTerreno.horasAutonomia(stockActualKg, consumoPromedioDiarioKg)
 }
 
+// Estados del semáforo de capacidad.
 enum class EstadoSilo(val etiqueta: String) {
     NORMAL("Normal"),
     ADVERTENCIA("Advertencia"),
@@ -45,6 +46,7 @@ enum class EstadoSilo(val etiqueta: String) {
     }
 }
 
+// Tipos de movimiento: suma (carga) o resta (consumo) al stock.
 enum class TipoMovimiento(val etiqueta: String) {
     CARGA("Carga"),
     CONSUMO("Consumo"),
@@ -75,6 +77,7 @@ data class MovimientoUi(
     val pendienteSincronizar: Boolean,
 )
 
+// Ciclo de una solicitud de camión: Pendiente -> Aprobada o Rechazada.
 enum class EstadoSolicitud(val etiqueta: String) {
     PENDIENTE("Pendiente"),
     APROBADA("Aprobada"),

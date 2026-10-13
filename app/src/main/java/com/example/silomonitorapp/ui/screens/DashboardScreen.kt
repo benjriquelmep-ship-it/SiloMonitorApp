@@ -70,6 +70,7 @@ fun DashboardScreen(
     onVolver: () -> Unit,
 ) {
     val context = LocalContext.current
+    // Cálculo de los indicadores a partir de la lista de silos.
     val capacidadTotal = silos.sumOf { it.capacidadMaxKg }
     val stockTotal = silos.sumOf { it.stockActualKg }
     val llenadoGlobal = if (capacidadTotal > 0) (stockTotal / capacidadTotal * 100).toFloat() else 0f
@@ -160,6 +161,7 @@ fun DashboardScreen(
     }
 }
 
+// Tarjeta con un número destacado (indicador del dashboard).
 @Composable
 private fun Indicador(titulo: String, valor: String, detalle: String, modifier: Modifier = Modifier) {
     Card(
@@ -182,6 +184,7 @@ private fun Indicador(titulo: String, valor: String, detalle: String, modifier: 
     }
 }
 
+// Tarjeta blanca con título para agrupar contenido.
 @Composable
 private fun Seccion(titulo: String, contenido: @Composable () -> Unit) {
     Card(
@@ -201,7 +204,9 @@ private fun Seccion(titulo: String, contenido: @Composable () -> Unit) {
 @Composable
 private fun GraficoConsumo(dias: List<ConsumoDia>) {
     if (dias.isEmpty()) return
+    // Valor más alto: define la altura máxima de las columnas.
     val maximo = dias.maxOf { it.kg }
+    // Columna seleccionada (al tocarla se muestra su valor exacto).
     var seleccionado by remember(dias) { mutableStateOf(dias.indices.maxByOrNull { dias[it].kg }?.takeIf { maximo > 0 }) }
     val colorGrilla = MaterialTheme.colorScheme.outlineVariant
     val colorSuperficie = MaterialTheme.colorScheme.surface
@@ -228,6 +233,7 @@ private fun GraficoConsumo(dias: List<ConsumoDia>) {
                 }
             },
     ) {
+        // Canvas: dibuja el gráfico de columnas a mano (línea base + una barra por día).
         Canvas(Modifier.fillMaxSize()) {
             val ancho = size.width / dias.size
             val anchoBarra = (ancho * 0.55f).coerceAtMost(28.dp.toPx())

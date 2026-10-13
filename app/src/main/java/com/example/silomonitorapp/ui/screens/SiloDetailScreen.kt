@@ -56,6 +56,8 @@ import com.example.silomonitorapp.ui.model.SiloUi
 import com.example.silomonitorapp.ui.model.silosDemo
 import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 
+// PANTALLA ficha técnica del silo: nivel, autonomía, datos, acciones e historial.
+// Los botones que el rol no puede usar llegan como null y no se muestran.
 @Composable
 fun SiloDetailScreen(
     silo: SiloUi?,
@@ -66,6 +68,7 @@ fun SiloDetailScreen(
     onEditar: ((SiloUi) -> Unit)? = null, // null: el rol no puede editar silos
     onSolicitarCamion: ((SiloUi) -> Unit)? = null, // null: el rol no coordina reposición
 ) {
+    // Scaffold: estructura de la pantalla (barra superior + contenido).
     Scaffold(
         topBar = {
             AriztiaTopBar(
@@ -179,8 +182,10 @@ fun SiloDetailScreen(
     }
 }
 
+// Formato de fecha del historial, ej: 07/10 14:30.
 private val formatoFecha = SimpleDateFormat("dd/MM HH:mm", Locale.forLanguageTag("es-CL"))
 
+// Lista de los últimos movimientos del silo.
 @Composable
 private fun HistorialMovimientos(movimientos: List<MovimientoUi>) {
     Card(
@@ -206,6 +211,7 @@ private fun HistorialMovimientos(movimientos: List<MovimientoUi>) {
     }
 }
 
+// Una fila del historial: tipo, kilos, fecha, observación, foto y estado de sincronización.
 @Composable
 private fun FilaMovimiento(movimiento: MovimientoUi) {
     val esCarga = movimiento.tipo == TipoMovimiento.CARGA
@@ -242,6 +248,7 @@ private fun FilaMovimiento(movimiento: MovimientoUi) {
     }
 }
 
+// Aviso de color cuando el silo está en Advertencia o Crítico.
 @Composable
 private fun AvisoEstado(estado: EstadoSilo) {
     val texto = when (estado) {
@@ -261,6 +268,7 @@ private fun AvisoEstado(estado: EstadoSilo) {
     }
 }
 
+// Fila 'etiqueta : valor' de la ficha técnica.
 @Composable
 private fun FilaDato(
     etiqueta: String,

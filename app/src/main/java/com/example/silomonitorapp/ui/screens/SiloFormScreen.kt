@@ -118,6 +118,7 @@ fun SiloFormScreen(
         }
     }
 
+    // Valida todos los campos al tocar Guardar. Devuelve true solo si no hay ningún error.
     fun validarFormulario(): Boolean {
         errorCodigo = ValidadorFormularios.validarCodigoSilo(codigo)
         errorGranja = ValidadorFormularios.validarObligatorio(granja, "La granja es obligatoria")
@@ -175,6 +176,7 @@ fun SiloFormScreen(
         else avisoUbicacion = "Se necesita permiso de ubicación para usar el GPS."
     }
 
+    // Revisa el permiso de ubicación: si ya está concedido lee el GPS, si no, lo pide.
     fun usarMiUbicacion() {
         val tienePermiso = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
             PackageManager.PERMISSION_GRANTED ||
@@ -420,5 +422,6 @@ private fun CampoValidado(
     )
 }
 
+// Muestra 30000.0 como "30000" al cargar un silo para editarlo.
 private fun sinDecimales(valor: Double): String =
     if (valor % 1.0 == 0.0) valor.toLong().toString() else valor.toString()

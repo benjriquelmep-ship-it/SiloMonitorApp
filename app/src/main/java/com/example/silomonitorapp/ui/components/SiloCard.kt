@@ -32,16 +32,21 @@ import com.example.silomonitorapp.ui.theme.SiloMonitorAppTheme
 import java.text.NumberFormat
 import java.util.Locale
 
+// Formato numérico chileno (punto como separador de miles).
 private val formatoKg = NumberFormat.getIntegerInstance(Locale.forLanguageTag("es-CL"))
 
+// Formatea kilos con punto de miles al estilo chileno: 21500.0 -> "21.500 kg".
 fun formatearKg(kg: Double): String = "${formatoKg.format(kg)} kg"
 
+// Convierte horas en texto legible: 52 -> "2 d 4 h".
 fun formatearAutonomia(horas: Double?): String = when {
     horas == null -> "Sin datos de consumo"
     horas < 24 -> "${horas.toInt()} h"
     else -> "${(horas / 24).toInt()} d ${(horas % 24).toInt()} h"
 }
 
+// Tarjeta de un silo en la lista: nombre, estado (semáforo), barra de nivel y autonomía.
+// Al tocarla se abre la ficha del silo.
 @Composable
 fun SiloCard(silo: SiloUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
