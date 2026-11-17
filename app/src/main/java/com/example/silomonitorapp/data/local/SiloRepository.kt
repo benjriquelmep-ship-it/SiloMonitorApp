@@ -1,14 +1,31 @@
 package com.example.silomonitorapp.data.local
 
+import com.example.silomonitorapp.data.remote.ErroresApi
+import com.example.silomonitorapp.data.remote.MovimientoRequestDto
+import com.example.silomonitorapp.data.remote.RetrofitClient
+import com.example.silomonitorapp.data.remote.SiloApiService
+import com.example.silomonitorapp.data.remote.aDto
+import com.example.silomonitorapp.data.remote.aEntidad
 import com.example.silomonitorapp.domain.ReglasTerreno
+import java.io.IOException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import retrofit2.HttpException
 
 // REPOSITORY (patrón MVVM): único punto de acceso a los datos de silos.
-// El ViewModel nunca habla con Room directamente, siempre pasa por aquí.
+// El ViewModel nunca habla con Room ni con Retrofit directamente, siempre pasa por aquí.
 // Todas las funciones 'suspend' corren en Dispatchers.IO para no congelar la pantalla.
-class SiloRepository(private val db: AppDatabase) {
+//
+// Fuentes de datos:
+//  - api (Retrofit -> microservicio ms-silos): fuente OFICIAL de los silos y movimientos.
+//  - db  (Room): copia local que alimenta la UI y permite seguir trabajando sin internet.
+// El 'api' llega por constructor para poder reemplazarlo por un mock en las pruebas unitarias.
+class SiloRepository(
+    private val db: AppDatabase,
+    private val api: SiloApiService = RetrofitClient.siloApi
+) {
 
     // Los DAO de cada tabla (las consultas SQL).
     private val siloDao = db.siloDao()
@@ -84,38 +101,59 @@ class SiloRepository(private val db: AppDatabase) {
         val silo = siloDao.obtenerSiloPorId(idSilo)
             ?: return@withContext Result.failure(Exception("Silo no encontrado en el sistema"))
 
-        // 2) Calcula el nuevo stock aplicando las reglas; si no cumple, devuelve el error.
-        val nuevoNivel = ReglasTerreno.calcularNuevoNivel(silo.nivelActual, silo.capacidadMaxima, cantidadKg, esCarga)
+        // 2) Valida localmente (respuesta inmediata, incluso sin internet).
+        val nivelLocal = ReglasTerreno.calcularNuevoNivel(silo.nivelActual, silo.capacidadMaxima, cantidadKg, esCarga)
             .getOrElse { return@withContext Result.failure(it) }
 
-        // Nivel e historial se guardan juntos: o quedan ambos o ninguno
-        db.runInTransaction {
-            siloDao.actualizarNivel(idSilo, nuevoNivel)
+        val tipo = if (esCarga) "CARGA" else "CONSUMO"
+        val fecha = System.currentTimeMillis()
+
+        // 3) Envía el movimiento al microservicio (POST /api/silos/{id}/movimientos).
+        //    - Si responde OK: se usa el stock que calculó el servidor (fuente oficial).
+        //    - Si el servidor lo rechaza (HttpException 409): se muestra su mensaje y no se guarda.
+        //    - Si no hay conexión (IOException): se guarda local y queda PENDIENTE (offline-first).
+        val siloServidor = try {
+            api.registrarMovimiento(idSilo, MovimientoRequestDto(tipo, cantidadKg, observacion, fecha))
+        } catch (e: HttpException) {
+            return@withContext Result.failure(Exception(ErroresApi.mensaje(e)))
+        } catch (e: IOException) {
+            null
+        }
+        val nivelFinal = siloServidor?.nivelActual ?: nivelLocal
+
+        // 4) Nivel e historial se guardan juntos en Room: o quedan ambos o ninguno.
+        db.runInTransaction(Runnable {
+            siloDao.actualizarNivel(idSilo, nivelFinal)
             movimientoDao.insertar(
                 MovimientoEntity(
                     siloId = idSilo,
-                    tipo = if (esCarga) "CARGA" else "CONSUMO",
+                    tipo = tipo,
                     cantidadKg = cantidadKg,
+                    fecha = fecha,
                     observacion = observacion,
-                    fotoUri = fotoUri
+                    fotoUri = fotoUri,
+                    pendienteSincronizar = siloServidor == null
                 )
             )
-        }
+        })
         // Devuelve el silo con el stock nuevo (el ViewModel lo usa para la alerta crítica).
-        Result.success(silo.copy(nivelActual = nuevoNivel))
+        Result.success(silo.copy(nivelActual = nivelFinal))
     }
 
-    // Alta manual de un silo nuevo (respaldo ante fallas del QR y alta de infraestructura)
+    // CREATE: alta de un silo nuevo. Primero se crea en el microservicio y luego se guarda en Room.
     suspend fun crearSilo(silo: SiloEntity): Result<Unit> = withContext(Dispatchers.IO) {
         // No se permiten códigos repetidos.
         if (siloDao.obtenerSiloPorId(silo.id) != null) {
             return@withContext Result.failure(Exception("Ya existe un silo con el código ${silo.id}."))
         }
-        siloDao.insertarSilo(silo)
-        Result.success(Unit)
+        llamarApi {
+            val creado = api.crearSilo(silo.aDto())        // POST /api/silos
+            siloDao.insertarSilo(creado.aEntidad())
+            Unit
+        }
     }
 
-    // Edita los datos maestros; el stock se conserva porque solo cambia con movimientos
+    // UPDATE: edita los datos maestros; el stock se conserva porque solo cambia con movimientos
     suspend fun editarSilo(silo: SiloEntity): Result<Unit> = withContext(Dispatchers.IO) {
         // Se lee el silo actual para conservar su stock real.
         val actual = siloDao.obtenerSiloPorId(silo.id)
@@ -123,9 +161,66 @@ class SiloRepository(private val db: AppDatabase) {
         if (actual.nivelActual > silo.capacidadMaxima) {
             return@withContext Result.failure(Exception("La capacidad no puede ser menor al stock actual (${actual.nivelActual.toInt()} kg)."))
         }
-        siloDao.actualizarSilo(silo.copy(nivelActual = actual.nivelActual))
-        Result.success(Unit)
+        llamarApi {
+            val conStock = silo.copy(nivelActual = actual.nivelActual)
+            val editado = api.editarSilo(silo.id, conStock.aDto())   // PUT /api/silos/{id}
+            siloDao.actualizarSilo(editado.aEntidad())
+            Unit
+        }
     }
+
+    // DELETE: elimina el silo en el microservicio y después en Room.
+    suspend fun eliminarSilo(id: String): Result<Unit> = withContext(Dispatchers.IO) {
+        llamarApi {
+            val respuesta = api.eliminarSilo(id)                     // DELETE /api/silos/{id}
+            // 404 = ya no existía en el servidor: igual se borra la copia local.
+            if (!respuesta.isSuccessful && respuesta.code() != 404) throw HttpException(respuesta)
+            siloDao.eliminarPorId(id)
+            Unit
+        }
+    }
+
+    // SINCRONIZACIÓN con ms-silos:
+    // 1) Envía los movimientos hechos sin internet (pendientes).
+    // 2) Descarga todos los silos del servidor y actualiza Room (READ).
+    // Devuelve cuántos movimientos pendientes se enviaron.
+    suspend fun sincronizarConServidor(): Result<Int> = withContext(Dispatchers.IO) {
+        llamarApi {
+            var enviados = 0
+            for (mov in movimientoDao.obtenerPendientesSincronizar()) {
+                try {
+                    api.registrarMovimiento(
+                        mov.siloId,
+                        MovimientoRequestDto(mov.tipo, mov.cantidadKg, mov.observacion, mov.fecha)
+                    )
+                    enviados++
+                } catch (e: HttpException) {
+                    // El servidor lo rechazó (ej: ya no cabe porque otro usuario cargó antes).
+                    // Se descarta para no bloquear la cola; el stock oficial llega en el paso 2.
+                }
+                // Se marca uno por uno: si se corta internet a la mitad, no se reenvían duplicados.
+                movimientoDao.marcarComoSincronizados(listOf(mov.id))
+            }
+
+            val silosServidor = api.listarSilos().map { it.aEntidad() }   // GET /api/silos
+            db.runInTransaction(Runnable {
+                siloDao.upsertSilos(silosServidor)
+                siloDao.eliminarAusentes(silosServidor.map { it.id })
+            })
+            enviados
+        }
+    }
+
+    // Ejecuta una llamada al microservicio y convierte cualquier error en un mensaje legible.
+    // 'inline' permite llamar funciones suspend dentro del bloque.
+    private inline fun <T> llamarApi(bloque: () -> T): Result<T> =
+        try {
+            Result.success(bloque())
+        } catch (e: CancellationException) {
+            throw e // se respeta la cancelación de corrutinas
+        } catch (e: Exception) {
+            Result.failure(Exception(ErroresApi.mensaje(e)))
+        }
 
     // Datos semilla iniciales coincidentes con la UI de Ariztía (cada silo con su propia ubicación)
     suspend fun precargarSilosSiEstaVacio() = withContext(Dispatchers.IO) {
