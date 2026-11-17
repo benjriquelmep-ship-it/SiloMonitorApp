@@ -17,10 +17,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -32,7 +34,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +74,27 @@ fun SiloDetailScreen(
     movimientos: List<MovimientoUi> = emptyList(),
     onEditar: ((SiloUi) -> Unit)? = null, // null: el rol no puede editar silos
     onSolicitarCamion: ((SiloUi) -> Unit)? = null, // null: el rol no coordina reposición
+    onEliminar: ((SiloUi) -> Unit)? = null, // null: el rol no puede eliminar silos
 ) {
+    // Controla el diálogo de confirmación antes de eliminar.
+    var confirmarEliminar by remember { mutableStateOf(false) }
+    if (confirmarEliminar && silo != null && onEliminar != null) {
+        AlertDialog(
+            onDismissRequest = { confirmarEliminar = false },
+            title = { Text("Eliminar ${silo.codigo}") },
+            text = { Text("Se eliminará el silo y todo su historial de movimientos. ¿Continuar?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmarEliminar = false
+                    onEliminar(silo)
+                }) { Text("Eliminar", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmarEliminar = false }) { Text("Cancelar") }
+            },
+        )
+    }
+
     // Scaffold: estructura de la pantalla (barra superior + contenido).
     Scaffold(
         topBar = {
@@ -78,6 +105,11 @@ fun SiloDetailScreen(
                     if (silo != null && onEditar != null) {
                         IconButton(onClick = { onEditar(silo) }) {
                             Icon(Icons.Filled.Edit, contentDescription = "Editar silo")
+                        }
+                    }
+                    if (silo != null && onEliminar != null) {
+                        IconButton(onClick = { confirmarEliminar = true }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "Eliminar silo")
                         }
                     }
                 },

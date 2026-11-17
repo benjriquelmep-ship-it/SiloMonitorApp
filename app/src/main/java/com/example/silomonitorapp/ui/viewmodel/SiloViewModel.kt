@@ -76,49 +76,70 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
                     longitud = entity.longitud
                 )
             }
-        // stateIn convierte el Flow en StateFlow: guarda el último valor para la UI.
-        // WhileSubscribed(5000): deja de escuchar Room 5 s después de que nadie lo observe.
+            // stateIn convierte el Flow en StateFlow: guarda el último valor para la UI.
+            // WhileSubscribed(5000): deja de escuchar Room 5 s después de que nadie lo observe.
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-        // Precarga de datos semilla (el repositorio ya trabaja en Dispatchers.IO)
+        // Al abrir la app: datos semilla si Room está vacío y luego descarga los silos de ms-silos.
         viewModelScope.launch {
             try {
                 repository.precargarSilosSiEstaVacio()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+            repository.sincronizarConServidor()
+                .onFailure { _mensajeOperacion.value = "Modo sin conexión: ${it.message}" }
         }
     }
 
-    /** Sincroniza lotes pendientes de Room hacia Cloud Firestore */
-    fun sincronizarConFirestore() {
+    /**
+     * Botón "Sincronizar":
+     * 1) ms-silos: envía movimientos pendientes y descarga los silos (Retrofit).
+     * 2) Firestore: solicitudes de camión (hasta que exista el microservicio de solicitudes).
+     */
+    fun sincronizar() {
         // Evita sincronizar dos veces al mismo tiempo si se toca el botón repetidamente.
         if (_sincronizando.value) return
         viewModelScope.launch {
             // true muestra el indicador de carga en la barra superior; false lo oculta.
             _sincronizando.value = true
-            val res = syncRepository.sincronizarTodo()
+            val resSilos = repository.sincronizarConServidor()
+            val resNube = syncRepository.sincronizarTodo()
             _sincronizando.value = false
             // Arma el mensaje del Toast según el resultado.
-            _mensajeOperacion.value = if (res.exitoso) {
-                if (res.movimientosSincronizados == 0 && res.solicitudesSincronizadas == 0) {
-                    "Todo está al día con la nube"
-                } else {
-                    "Sincronizados: ${res.movimientosSincronizados} movimientos y ${res.solicitudesSincronizadas} solicitudes"
-                }
-            } else {
-                "Error al sincronizar: ${res.error ?: "desconocido"}"
-            }
+            _mensajeOperacion.value = resSilos.fold(
+                onSuccess = { enviados ->
+                    val solicitudes = if (resNube.solicitudesSincronizadas > 0) {
+                        " y ${resNube.solicitudesSincronizadas} solicitudes"
+                    } else ""
+                    if (enviados == 0) "Silos actualizados desde el servidor$solicitudes"
+                    else "Enviados $enviados movimientos pendientes$solicitudes"
+                },
+                onFailure = { "Error al sincronizar: ${it.message}" }
+            )
         }
     }
 
+    /** Elimina el silo en ms-silos y en Room. Devuelve true si se eliminó. */
+    suspend fun eliminarSilo(id: String): Boolean =
+        repository.eliminarSilo(id).fold(
+            onSuccess = {
+                _mensajeOperacion.value = "Silo $id eliminado"
+                true
+            },
+            onFailure = {
+                _mensajeOperacion.value = it.message ?: "No se pudo eliminar el silo"
+                false
+            }
+        )
+
     /** Bandeja de solicitudes de camión, con el nombre y la granja de cada silo. */
     val solicitudesUi: StateFlow<List<SolicitudUi>> =
-        // combine junta dos flujos: cada vez que cambian las solicitudes o los silos,
+    // combine junta dos flujos: cada vez que cambian las solicitudes o los silos,
         // se vuelve a armar la lista con el nombre y la granja de cada silo.
         combine(repository.solicitudesFlow, repository.silosFlow) { solicitudes, silos ->
             val silosPorId = silos.associateBy { it.id }
