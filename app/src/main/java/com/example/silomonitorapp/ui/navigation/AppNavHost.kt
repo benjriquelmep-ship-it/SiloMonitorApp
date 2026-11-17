@@ -128,7 +128,7 @@ fun AppNavHost(
                 } else null,
                 solicitudesPendientes = pendientes,
                 sincronizando = sincronizando,
-                onSincronizar = { viewModel.sincronizarConFirestore() },
+                onSincronizar = { viewModel.sincronizar() },
             )
         }
 
@@ -170,6 +170,14 @@ fun AppNavHost(
                 } else null,
                 onSolicitarCamion = if (rol.puedeSolicitarCamion) {
                     { mostrarCamion = true }
+                } else null,
+                // Eliminar (DELETE en ms-silos): solo roles que gestionan silos.
+                onEliminar = if (rol.puedeGestionarSilos) {
+                    { s ->
+                        scope.launch {
+                            if (viewModel.eliminarSilo(s.id)) navController.popBackStack()
+                        }
+                    }
                 } else null,
             )
         }

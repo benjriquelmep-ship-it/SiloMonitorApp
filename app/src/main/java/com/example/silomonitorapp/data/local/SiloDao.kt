@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
 // DAO (Data Access Object): las consultas SQL de la tabla 'silos'.
@@ -44,5 +45,18 @@ interface SiloDao {
     // Lista simple (sin Flow) para subirla a Firestore al sincronizar.
     @Query("SELECT * FROM silos")
     fun obtenerTodosDirecto(): List<SiloEntity>
+
+    // Guarda los silos que llegan del microservicio: inserta los nuevos y actualiza los existentes.
+    // Se usa @Upsert (no REPLACE) porque REPLACE borra la fila y, por el CASCADE, borraría su historial.
+    @Upsert
+    fun upsertSilos(silos: List<SiloEntity>)
+
+    // Borra un silo (sus movimientos y solicitudes se borran solos por ForeignKey.CASCADE).
+    @Query("DELETE FROM silos WHERE id = :id")
+    fun eliminarPorId(id: String): Int
+
+    // Borra los silos locales que ya no existen en el servidor (los eliminó otro usuario).
+    @Query("DELETE FROM silos WHERE id NOT IN (:idsServidor)")
+    fun eliminarAusentes(idsServidor: List<String>): Int
 
 }

@@ -27,10 +27,22 @@ android {
 
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
 
+        // URL del microservicio ms-silos. Por defecto 10.0.2.2 (el PC visto desde el emulador).
+        // Con celular físico: agregar API_SILOS_URL=http://IP_DEL_PC:8080/ en local.properties
+        buildConfigField(
+            "String",
+            "API_SILOS_URL",
+            "\"${localProperties.getProperty("API_SILOS_URL", "http://10.0.2.2:8080/")}\""
+        )
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
+        debug {
+            // Genera el reporte de cobertura de las pruebas unitarias (tarea createDebugUnitTestCoverageReport)
+            enableUnitTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -45,6 +57,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // Genera la clase BuildConfig (con API_SILOS_URL)
+        buildConfig = true
     }
 }
 
@@ -92,8 +106,17 @@ dependencies {
     implementation("com.google.maps.android:maps-compose:6.4.1")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
+    // Retrofit: consumo del microservicio ms-silos (JSON con Gson) + log de peticiones
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
     // Testing
     testImplementation(libs.junit)
+    // MockK: crea objetos falsos (mocks) de la API y de Room en las pruebas unitarias
+    testImplementation("io.mockk:mockk:1.13.17")
+    // runTest: permite probar funciones suspend
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.espresso.core)
