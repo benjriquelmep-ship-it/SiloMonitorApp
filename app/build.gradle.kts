@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.ksp)
     // Lee app/google-services.json para que Firebase (Firestore) se inicialice al abrir la app
     id("com.google.gms.google-services")
+    id("de.mannodermaus.android-junit") version "2.0.2"
 }
 
 // La API key de Google Maps se lee desde local.properties (MAPS_API_KEY=...), nunca se sube al repo
@@ -111,14 +112,25 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
-    // Testing
-    testImplementation(libs.junit)
-    // MockK: crea objetos falsos (mocks) de la API y de Room en las pruebas unitarias
-    testImplementation("io.mockk:mockk:1.13.17")
-    // runTest: permite probar funciones suspend
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    //TEST
+    // --- Pruebas Unitarias (JVM: carpeta test) ---
+    testImplementation(libs.junit) // Compatibilidad con tests JUnit 4 existentes
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
+    testImplementation("org.junit.jupiter:junit-jupiter-api")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine")
+
+    // Kotest (aserciones expresivas con shouldBe)
+    testImplementation("io.kotest:kotest-assertions-core:6.2.7")
+
+    // MockK y Coroutines Test
+    testImplementation("io.mockk:mockk:1.14.12")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+
+    // --- Pruebas Instrumentadas / Compose UI Test (JUnit 4: carpeta androidTest) ---
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
