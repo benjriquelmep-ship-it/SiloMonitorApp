@@ -36,11 +36,12 @@ import java.util.Locale
 // Conecta las pantallas con el Repository: transforma los datos de Room en modelos de UI
 // (SiloUi, MovimientoUi...) y los expone como StateFlow. Las pantallas solo observan
 // estos flujos y llaman a sus funciones; nunca tocan la base de datos.
-class SiloViewModel(application: Application) : AndroidViewModel(application) {
-
-    // Acceso a los datos locales (Room) y a la sincronización con la nube (Firestore).
-    private val repository: SiloRepository
-    private val syncRepository: SyncRepository = SyncRepository(application)
+class SiloViewModel(
+    application: Application,
+    // Inyectables por constructor para pruebas unitarias; en producción usan sus valores por defecto.
+    private val repository: SiloRepository = SiloRepository(AppDatabase.obtenerBaseDatos(application)),
+    private val syncRepository: SyncRepository = SyncRepository(application),
+) : AndroidViewModel(application) {
 
     // Estado reactivo de la sincronización remota con Firestore
     private val _sincronizando = MutableStateFlow(false)
@@ -56,10 +57,6 @@ class SiloViewModel(application: Application) : AndroidViewModel(application) {
 
     // init: se ejecuta una vez al crear el ViewModel.
     init {
-        // Abre la base de datos y crea el repositorio.
-        val db = AppDatabase.obtenerBaseDatos(application)
-        repository = SiloRepository(db)
-
         // Convierte cada SiloEntity de Room a SiloUi en tiempo real
         silosUi = repository.silosFlow.map { lista ->
             lista.map { entity ->
