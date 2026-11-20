@@ -235,4 +235,16 @@ class SiloRepositoryTest {
 
         assertEquals(ErroresApi.SIN_CONEXION, resultado.exceptionOrNull()?.message)
     }
+
+    @Test
+    fun sincronizar_servidorRetornaListaVacia_actualizaRoomSinErrores() = runTest {
+        every { movimientoDao.obtenerPendientesSincronizar() } returns emptyList()
+        coEvery { api.listarSilos() } returns emptyList()
+
+        val resultado = repository.sincronizarConServidor()
+
+        assertTrue(resultado.isSuccess)
+        assertEquals(0, resultado.getOrThrow())
+        verify { siloDao.upsertSilos(emptyList()) }
+    }
 }
