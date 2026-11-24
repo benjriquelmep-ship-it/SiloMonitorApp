@@ -3,9 +3,12 @@ package com.example.silomonitorapp.data.local
 import com.example.silomonitorapp.data.remote.ErroresApi
 import com.example.silomonitorapp.data.remote.MovimientoRequestDto
 import com.example.silomonitorapp.data.remote.RetrofitClient
+import com.example.silomonitorapp.data.remote.RevisionRequestDto
 import com.example.silomonitorapp.data.remote.SiloApiService
+import com.example.silomonitorapp.data.remote.SolicitudApiService
 import com.example.silomonitorapp.data.remote.aDto
 import com.example.silomonitorapp.data.remote.aEntidad
+import com.example.silomonitorapp.data.remote.aRequest
 import com.example.silomonitorapp.domain.ReglasTerreno
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
@@ -19,12 +22,14 @@ import retrofit2.HttpException
 // Todas las funciones 'suspend' corren en Dispatchers.IO para no congelar la pantalla.
 //
 // Fuentes de datos:
-//  - api (Retrofit -> microservicio ms-silos): fuente OFICIAL de los silos y movimientos.
-//  - db  (Room): copia local que alimenta la UI y permite seguir trabajando sin internet.
-// El 'api' llega por constructor para poder reemplazarlo por un mock en las pruebas unitarias.
+//  - api            (Retrofit -> microservicio ms-silos): fuente OFICIAL de los silos y movimientos.
+//  - apiSolicitudes (Retrofit -> microservicio ms-solicitudes): fuente OFICIAL de las solicitudes de camión.
+//  - db             (Room): copia local que alimenta la UI y permite seguir trabajando sin internet.
+// Las APIs llegan por constructor para poder reemplazarlas por mocks en las pruebas unitarias.
 class SiloRepository(
     private val db: AppDatabase,
-    private val api: SiloApiService = RetrofitClient.siloApi
+    private val api: SiloApiService = RetrofitClient.siloApi,
+    private val apiSolicitudes: SolicitudApiService = RetrofitClient.solicitudApi
 ) {
 
     // Los DAO de cada tabla (las consultas SQL).
@@ -62,25 +67,95 @@ class SiloRepository(
         if (solicitudDao.contarPendientesDeSilo(siloId) > 0) {
             return@withContext Result.failure(Exception("Ya hay un camión pendiente de aprobación para este silo."))
         }
-        // 4) Se guarda la solicitud (queda PENDIENTE y pendiente de sincronizar).
-        solicitudDao.insertar(
-            SolicitudCamionEntity(
-                siloId = siloId,
-                kgSolicitados = kgSolicitados,
-                urgente = urgente,
-                observacion = observacion,
-                solicitadoPor = solicitadoPor
-            )
+        // 4) Se envía al microservicio ms-solicitudes (POST /api/solicitudes).
+        //    - Si responde OK: se guarda en Room con el id del servidor (ya sincronizada).
+        //    - Si el servidor la rechaza (HttpException 409): se muestra su mensaje y no se guarda.
+        //    - Si no hay conexión (IOException): se guarda local con id NEGATIVO y queda pendiente.
+        //      El id negativo evita chocar con los ids del servidor hasta que se sincronice.
+        val fecha = System.currentTimeMillis()
+        val nueva = SolicitudCamionEntity(
+            id = -fecha,
+            siloId = siloId,
+            kgSolicitados = kgSolicitados,
+            urgente = urgente,
+            observacion = observacion,
+            solicitadoPor = solicitadoPor,
+            fechaSolicitud = fecha
         )
+        val creada = try {
+            apiSolicitudes.crear(nueva.aRequest())
+        } catch (e: HttpException) {
+            return@withContext Result.failure(Exception(ErroresApi.mensaje(e)))
+        } catch (e: IOException) {
+            null
+        }
+        solicitudDao.insertarOActualizar(creada?.aEntidad() ?: nueva)
         Result.success(Unit)
     }
 
     // La Jefatura aprueba o rechaza una solicitud pendiente
     suspend fun revisarSolicitud(id: Long, aprobada: Boolean, revisadoPor: String): Result<Unit> = withContext(Dispatchers.IO) {
-        // Solo cambia solicitudes PENDIENTES; si devuelve 0 filas, ya había sido revisada.
+        val fecha = System.currentTimeMillis()
+        // 1) Si la solicitud ya existe en el servidor (id positivo), se revisa allá
+        //    (PATCH /api/solicitudes/{id}/revision) y se guarda la respuesta en Room.
+        if (id > 0) {
+            try {
+                val revisada = apiSolicitudes.revisar(id, RevisionRequestDto(aprobada, revisadoPor, fecha))
+                solicitudDao.insertarOActualizar(revisada.aEntidad())
+                return@withContext Result.success(Unit)
+            } catch (e: HttpException) {
+                // Ej: otro usuario ya la revisó (409).
+                return@withContext Result.failure(Exception(ErroresApi.mensaje(e)))
+            } catch (e: IOException) {
+                // Sin conexión: se revisa localmente y se envía en la próxima sincronización.
+            }
+        }
+        // 2) Revisión local: solo cambia solicitudes PENDIENTES y la deja pendiente de sincronizar.
         val estado = if (aprobada) SolicitudCamionEntity.ESTADO_APROBADA else SolicitudCamionEntity.ESTADO_RECHAZADA
-        val filas = solicitudDao.revisar(id, estado, revisadoPor, System.currentTimeMillis())
+        val filas = solicitudDao.revisar(id, estado, revisadoPor, fecha)
         if (filas == 0) Result.failure(Exception("La solicitud ya fue revisada.")) else Result.success(Unit)
+    }
+
+    // SINCRONIZACIÓN con ms-solicitudes:
+    // 1) Envía lo hecho sin internet: solicitudes nuevas (id negativo) y revisiones pendientes.
+    // 2) Descarga la bandeja oficial del servidor y reemplaza la copia de Room.
+    // Devuelve cuántas solicitudes pendientes se enviaron.
+    suspend fun sincronizarSolicitudes(): Result<Int> = withContext(Dispatchers.IO) {
+        llamarApi {
+            var enviadas = 0
+            for (local in solicitudDao.obtenerPendientesSincronizar()) {
+                try {
+                    // Nueva sin internet: se crea en el servidor y se usa el id que devuelve.
+                    val idServidor = if (local.id < 0) apiSolicitudes.crear(local.aRequest()).id else local.id
+                    // Revisada sin internet: se envía la aprobación o el rechazo.
+                    if (local.estado != SolicitudCamionEntity.ESTADO_PENDIENTE) {
+                        apiSolicitudes.revisar(
+                            idServidor,
+                            RevisionRequestDto(
+                                aprobada = local.estado == SolicitudCamionEntity.ESTADO_APROBADA,
+                                revisadoPor = local.revisadoPor.orEmpty(),
+                                fechaRevision = local.fechaRevision
+                            )
+                        )
+                    }
+                    enviadas++
+                } catch (e: HttpException) {
+                    // El servidor la rechazó (ej: ya había un camión pendiente para ese silo).
+                    // Se descarta; la bandeja oficial llega en el paso 2.
+                }
+            }
+
+            // Solo se guardan solicitudes de silos que existen en Room (la tabla tiene clave foránea).
+            val silosLocales = siloDao.obtenerTodosDirecto().map { it.id }.toSet()
+            val servidor = apiSolicitudes.listar()                    // GET /api/solicitudes
+                .map { it.aEntidad() }
+                .filter { it.siloId in silosLocales }
+            db.runInTransaction(Runnable {
+                solicitudDao.eliminarTodas()
+                solicitudDao.insertarTodas(servidor)
+            })
+            enviadas
+        }
     }
 
     // Busca un silo por código en un hilo de fondo.

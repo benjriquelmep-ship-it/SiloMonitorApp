@@ -57,86 +57,60 @@ class SyncRepository(private val context: Context) {
 
         runCatching {
             withTimeout(TIEMPO_MAXIMO_MS) {
-            var totalMovs = 0
-            var totalSols = 0
+                var totalMovs = 0
 
-            // 1. Obtener y subir silos actuales
-            val silos = localDb.siloDao().obtenerTodosDirecto()
-            for (silo in silos) {
-                val datosSilo = hashMapOf(
-                    "id" to silo.id,
-                    "nombre" to silo.nombre,
-                    "granja" to silo.granja,
-                    "galpon" to silo.galpon,
-                    "tipoAlimento" to silo.tipoAlimento,
-                    "capacidadMaxima" to silo.capacidadMaxima,
-                    "nivelActual" to silo.nivelActual,
-                    "consumoPromedioDiario" to silo.consumoPromedioDiario,
-                    "latitud" to silo.latitud,
-                    "longitud" to silo.longitud,
-                    "ultimaActualizacion" to System.currentTimeMillis()
+                // 1. Obtener y subir silos actuales
+                val silos = localDb.siloDao().obtenerTodosDirecto()
+                for (silo in silos) {
+                    val datosSilo = hashMapOf(
+                        "id" to silo.id,
+                        "nombre" to silo.nombre,
+                        "granja" to silo.granja,
+                        "galpon" to silo.galpon,
+                        "tipoAlimento" to silo.tipoAlimento,
+                        "capacidadMaxima" to silo.capacidadMaxima,
+                        "nivelActual" to silo.nivelActual,
+                        "consumoPromedioDiario" to silo.consumoPromedioDiario,
+                        "latitud" to silo.latitud,
+                        "longitud" to silo.longitud,
+                        "ultimaActualizacion" to System.currentTimeMillis()
+                    )
+                    firestore.collection("silos")
+                        .document(silo.id)
+                        .set(datosSilo, SetOptions.merge())
+                        .await()
+                }
+
+                // 2. Obtener movimientos pendientes de sincronizar
+                val pendientes = localDb.movimientoDao().obtenerPendientesSincronizar()
+                if (pendientes.isNotEmpty()) {
+                    val idsExitosos = mutableListOf<Long>()
+                    for (mov in pendientes) {
+                        val datosMov = hashMapOf(
+                            "siloId" to mov.siloId,
+                            "tipo" to mov.tipo,
+                            "cantidadKg" to mov.cantidadKg,
+                            "fecha" to mov.fecha,
+                            "observacion" to mov.observacion,
+                            "fotoUri" to (mov.fotoUri ?: "")
+                        )
+                        firestore.collection("movimientos")
+                            .document("${mov.siloId}_${mov.fecha}")
+                            .set(datosMov)
+                            .await()
+                        idsExitosos.add(mov.id)
+                    }
+                    localDb.movimientoDao().marcarComoSincronizados(idsExitosos)
+                    totalMovs = idsExitosos.size
+                }
+
+                // Las solicitudes de camión ya NO se suben a Firestore: ahora su fuente oficial es
+                // el microservicio ms-solicitudes (ver SiloRepository.sincronizarSolicitudes).
+
+                ResultadoSync(
+                    exitoso = true,
+                    movimientosSincronizados = totalMovs
                 )
-                firestore.collection("silos")
-                    .document(silo.id)
-                    .set(datosSilo, SetOptions.merge())
-                    .await()
-            }
-
-            // 2. Obtener movimientos pendientes de sincronizar
-            val pendientes = localDb.movimientoDao().obtenerPendientesSincronizar()
-            if (pendientes.isNotEmpty()) {
-                val idsExitosos = mutableListOf<Long>()
-                for (mov in pendientes) {
-                    val datosMov = hashMapOf(
-                        "siloId" to mov.siloId,
-                        "tipo" to mov.tipo,
-                        "cantidadKg" to mov.cantidadKg,
-                        "fecha" to mov.fecha,
-                        "observacion" to mov.observacion,
-                        "fotoUri" to (mov.fotoUri ?: "")
-                    )
-                    firestore.collection("movimientos")
-                        .document("${mov.siloId}_${mov.fecha}")
-                        .set(datosMov)
-                        .await()
-                    idsExitosos.add(mov.id)
-                }
-                localDb.movimientoDao().marcarComoSincronizados(idsExitosos)
-                totalMovs = idsExitosos.size
-            }
-
-            // 3. Subir solicitudes de camión pendientes (nuevas, aprobadas o rechazadas)
-            val solicitudesPendientes = localDb.solicitudCamionDao().obtenerPendientesSincronizar()
-            if (solicitudesPendientes.isNotEmpty()) {
-                val idsExitosos = mutableListOf<Long>()
-                for (sol in solicitudesPendientes) {
-                    val datosSol = hashMapOf(
-                        "siloId" to sol.siloId,
-                        "kgSolicitados" to sol.kgSolicitados,
-                        "urgente" to sol.urgente,
-                        "observacion" to sol.observacion,
-                        "solicitadoPor" to sol.solicitadoPor,
-                        "fechaSolicitud" to sol.fechaSolicitud,
-                        "estado" to sol.estado,
-                        "revisadoPor" to sol.revisadoPor,
-                        "fechaRevision" to sol.fechaRevision
-                    )
-                    // Mismo documento al aprobar/rechazar: se actualiza en vez de duplicarse
-                    firestore.collection("solicitudes_camion")
-                        .document("${sol.siloId}_${sol.fechaSolicitud}")
-                        .set(datosSol)
-                        .await()
-                    idsExitosos.add(sol.id)
-                }
-                localDb.solicitudCamionDao().marcarComoSincronizadas(idsExitosos)
-                totalSols = idsExitosos.size
-            }
-
-            ResultadoSync(
-                exitoso = true,
-                movimientosSincronizados = totalMovs,
-                solicitudesSincronizadas = totalSols
-            )
             }
         }.getOrElse { exception ->
             val mensaje = if (exception is TimeoutCancellationException) {

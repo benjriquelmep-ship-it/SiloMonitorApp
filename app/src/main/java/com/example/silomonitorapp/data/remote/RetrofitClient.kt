@@ -10,6 +10,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 // Configuración única de Retrofit (patrón Singleton con 'object').
 // Hay una instancia de Retrofit por cada servidor (cada una con su URL base):
 //   - ms-silos        (microservicio propio)  -> BuildConfig.API_SILOS_URL
+//   - ms-solicitudes  (microservicio propio)  -> BuildConfig.API_SOLICITUDES_URL
 //   - Open-Meteo      (API externa pública)   -> https://api.open-meteo.com/
 // URLs de los microservicios (se definen en build.gradle.kts / local.properties):
 //   - Emulador:          http://10.0.2.2:PUERTO/   (10.0.2.2 = el "localhost" del PC visto desde el emulador)
@@ -41,6 +42,10 @@ object RetrofitClient {
 
     // 'by lazy': cada servicio se crea la primera vez que se usa.
     val siloApi: SiloApiService by lazy { crearRetrofit(BuildConfig.API_SILOS_URL).create(SiloApiService::class.java) }
+
+    val solicitudApi: SolicitudApiService by lazy {
+        crearRetrofit(BuildConfig.API_SOLICITUDES_URL).create(SolicitudApiService::class.java)
+    }
 
     val climaApi: ClimaApiService by lazy { crearRetrofit(URL_OPEN_METEO).create(ClimaApiService::class.java) }
 }

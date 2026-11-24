@@ -2,6 +2,7 @@ package com.example.silomonitorapp.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
@@ -39,7 +40,19 @@ interface SolicitudCamionDao {
     @Query("SELECT * FROM solicitudes_camion WHERE pendienteSincronizar = 1")
     fun obtenerPendientesSincronizar(): List<SolicitudCamionEntity>
 
-    // Marca como enviadas las solicitudes que ya se subieron a Firestore.
+    // Marca como enviadas las solicitudes que ya se subieron al servidor.
     @Query("UPDATE solicitudes_camion SET pendienteSincronizar = 0 WHERE id IN (:ids)")
     fun marcarComoSincronizadas(ids: List<Long>): Int
+
+    // Guarda o reemplaza la copia que devolvió ms-solicitudes (mismo id que en el servidor).
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertarOActualizar(solicitud: SolicitudCamionEntity): Long
+
+    // Guarda la bandeja completa descargada de ms-solicitudes.
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertarTodas(solicitudes: List<SolicitudCamionEntity>)
+
+    // Borra la copia local antes de reemplazarla por la del servidor.
+    @Query("DELETE FROM solicitudes_camion")
+    fun eliminarTodas(): Int
 }

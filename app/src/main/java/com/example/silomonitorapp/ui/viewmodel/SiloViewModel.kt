@@ -90,13 +90,16 @@ class SiloViewModel(
             }
             repository.sincronizarConServidor()
                 .onFailure { _mensajeOperacion.value = "Modo sin conexión: ${it.message}" }
+            // Descarga la bandeja de solicitudes de camión de ms-solicitudes (si falla, se sigue offline).
+            repository.sincronizarSolicitudes()
         }
     }
 
     /**
      * Botón "Sincronizar":
      * 1) ms-silos: envía movimientos pendientes y descarga los silos (Retrofit).
-     * 2) Firestore: solicitudes de camión (hasta que exista el microservicio de solicitudes).
+     * 2) ms-solicitudes: envía solicitudes de camión pendientes y descarga la bandeja (Retrofit).
+     * 3) Firestore: respaldo en la nube de silos y movimientos.
      */
     fun sincronizar() {
         // Evita sincronizar dos veces al mismo tiempo si se toca el botón repetidamente.
@@ -105,14 +108,14 @@ class SiloViewModel(
             // true muestra el indicador de carga en la barra superior; false lo oculta.
             _sincronizando.value = true
             val resSilos = repository.sincronizarConServidor()
-            val resNube = syncRepository.sincronizarTodo()
+            val resSolicitudes = repository.sincronizarSolicitudes()
+            syncRepository.sincronizarTodo()
             _sincronizando.value = false
             // Arma el mensaje del Toast según el resultado.
             _mensajeOperacion.value = resSilos.fold(
                 onSuccess = { enviados ->
-                    val solicitudes = if (resNube.solicitudesSincronizadas > 0) {
-                        " y ${resNube.solicitudesSincronizadas} solicitudes"
-                    } else ""
+                    val enviadasSolicitudes = resSolicitudes.getOrDefault(0)
+                    val solicitudes = if (enviadasSolicitudes > 0) " y $enviadasSolicitudes solicitudes" else ""
                     if (enviados == 0) "Silos actualizados desde el servidor$solicitudes"
                     else "Enviados $enviados movimientos pendientes$solicitudes"
                 },
