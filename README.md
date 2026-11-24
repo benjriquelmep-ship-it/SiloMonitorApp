@@ -64,6 +64,7 @@ En faenas de crianza y engorde avícola distribuidas geográficamente, el agotam
 ### 6. Logística de Camiones y Flujo de Reposición
 * **Solicitud (Supervisor/Admin):** Emisión de solicitudes de reposición desde la ficha del silo, sugiriendo automáticamente los kilos faltantes para el llenado y marcando prioridad urgente en silos críticos.
 * **Aprobación (Jefatura/Admin):** Bandeja unificada con acciones para autorizar o denegar despachos, bloqueando solicitudes duplicadas o solicitudes con volumen mayor a la capacidad libre.
+* Las solicitudes se gestionan en el microservicio **`ms-solicitudes`**; sin internet se guardan en Room y se envían en la siguiente sincronización.
 
 ### 7. Dashboard Analítico y Reportabilidad Ejecutiva
 * Tarjetas de resumen: llenado global consolidado, conteo de silos en condición crítica, silo con menor autonomía y solicitudes pendientes.
@@ -149,6 +150,7 @@ La app sigue los patrones **MVVM (Model-View-ViewModel)** y **Repository** con e
 | `domain` | Reglas puras y testeables: `ReglasTerreno`, `ReglasClima`, `ValidadorFormularios`, `Roles` |
 | `data/local` | Room: entidades, DAOs, `AppDatabase` y `SiloRepository` |
 | `data/remote` | Retrofit: `RetrofitClient`, servicios `SiloApiService`, `SolicitudApiService`, `ClimaApiService`, DTOs, `ClimaRepository` |
+| `data/sesion` | `SesionRepository` (sesión recordada) y `UsuariosDemo` (cuentas con hash SHA-256) |
 
 ### Paquetes de cada microservicio (`backend/ms-silos`, `backend/ms-solicitudes`)
 
@@ -225,7 +227,7 @@ Prueba rápida: abrir `http://localhost:8080/api/silos` y `http://localhost:8081
 
 | Módulo | Herramientas | Qué se prueba |
 |---|---|---|
-| App (`app/src/test`) | JUnit 5 + JUnit 4, MockK, Kotest, Coroutines Test | ViewModels (`SiloViewModel`, `ClimaViewModel`), repositorios (`SiloRepository`, solicitudes, `ClimaRepository`), modelos de UI y reglas de dominio |
+| App (`app/src/test`) | JUnit 5 + JUnit 4, MockK, Kotest, Coroutines Test | ViewModels (`SiloViewModel`, `SesionViewModel`, `ClimaViewModel`), repositorios (`SiloRepository`, solicitudes, `ClimaRepository`), DTOs, modelos de UI y reglas de dominio |
 | `ms-silos` / `ms-solicitudes` | JUnit 5 + Mockito | Reglas de negocio de cada `Service` |
 
 Las APIs (Retrofit) y Room se reemplazan por **mocks**, por lo que las pruebas no necesitan internet, microservicios encendidos ni emulador.
@@ -237,9 +239,18 @@ Las APIs (Retrofit) y Room se reemplazan por **mocks**, por lo que las pruebas n
 cd backend/ms-solicitudes && mvn test
 ```
 
-El reporte de cobertura mide la **lógica** (ViewModels, repositorios, dominio, DTOs) y excluye el código generado (R, BuildConfig, Room `*_Impl`), las pantallas Compose (se prueban con `androidTest`) y las clases que solo envuelven APIs de Android (Activity, notificaciones, PDF/CSV, Firestore).
+El reporte de cobertura mide la **lógica** (ViewModels, repositorios, dominio, DTOs y modelos) y excluye el código generado (R, BuildConfig, Room `*_Impl`), las pantallas Compose (se prueban con `androidTest`) y las clases que solo envuelven APIs de Android (Activity, notificaciones, PDF/CSV, Firestore).
 
-<!-- Agregar aquí una captura del reporte de cobertura: ![Cobertura](docs/cobertura.png) -->
+**Resultado (JaCoCo): 94 % de líneas, 88 % de instrucciones y 84 % de ramas** — supera el mínimo de 80 %.
+
+| Paquete | Líneas cubiertas |
+|---|---|
+| `data.local` | 89 % |
+| `ui.viewmodel` | 97 % |
+| `data.remote` | 92 % |
+| `domain` | 98 % |
+| `ui.model` | 100 % |
+| `data.sesion` | 100 % |
 
 ---
 
@@ -250,6 +261,8 @@ El reporte de cobertura mide la **lógica** (ViewModels, repositorios, dominio, 
 2. Crear la llave (`Create new…`): archivo `.jks`, contraseña, alias y datos del certificado.
 3. Elegir la variante **release** y finalizar. El APK queda en `app/release/app-release.apk`.
 
+> El archivo `.jks` y sus contraseñas **no** se suben al repositorio.
+
 Captura del APK firmado y del archivo `.jks`:
 
 <!-- ![APK firmado](docs/apk-firmado.png) -->
@@ -259,9 +272,9 @@ Captura del APK firmado y del archivo `.jks`:
 ## 📋 Planificación (Trello) y control de versiones
 
 * **Tablero Trello:** <!-- pegar aquí el enlace al tablero -->
-* **GitHub:** trabajo por ramas (`feature/*`, `fix/*`, `docs/*`) integradas a `master` mediante Pull Requests.
+* **GitHub:** trabajo por ramas (`feature/*`, `test/*`, `docs/*`) integradas a `master` mediante Pull Requests.
 
 | Integrante | Responsabilidades principales |
 |---|---|
 | Benjamín Riquelme | <!-- completar --> |
-| Aileen Oyaneder | <!-- completar --> |
+| Aileen Oyaneder | Consumo de la API externa Open-Meteo con Retrofit, microservicio `ms-solicitudes`, integración de la app con `ms-solicitudes` (offline-first), pruebas unitarias y cobertura JaCoCo, documentación (README) |
