@@ -7,6 +7,8 @@ plugins {
     // Lee app/google-services.json para que Firebase (Firestore) se inicialice al abrir la app
     id("com.google.gms.google-services")
     id("de.mannodermaus.android-junit") version "2.0.2"
+    // JaCoCo: mide qué porcentaje del código ejecutan las pruebas unitarias (cobertura)
+    jacoco
 }
 
 // La API key de Google Maps se lee desde local.properties (MAPS_API_KEY=...), nunca se sube al repo
@@ -35,6 +37,12 @@ android {
             "API_SILOS_URL",
             "\"${localProperties.getProperty("API_SILOS_URL", "http://10.0.2.2:8080/")}\""
         )
+        // URL del microservicio ms-solicitudes (puerto 8081). Celular físico: API_SOLICITUDES_URL en local.properties
+        buildConfigField(
+            "String",
+            "API_SOLICITUDES_URL",
+            "\"${localProperties.getProperty("API_SOLICITUDES_URL", "http://10.0.2.2:8081/")}\""
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -58,8 +66,83 @@ android {
     }
     buildFeatures {
         compose = true
-        // Genera la clase BuildConfig (con API_SILOS_URL)
+        // Genera la clase BuildConfig (con API_SILOS_URL y API_SOLICITUDES_URL)
         buildConfig = true
+    }
+    // Versión de JaCoCo compatible con Java 25 (el JDK que usa Gradle en este proyecto)
+    testCoverage {
+        jacocoVersion = "0.8.14"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// COBERTURA DE PRUEBAS UNITARIAS (JaCoCo)
+//   ./gradlew reporteCobertura    -> reporte HTML en app/build/reports/cobertura/html/index.html
+//   ./gradlew verificarCobertura  -> falla si la cobertura de líneas de la LÓGICA es menor a 80 %
+// Se excluye lo que no es lógica de negocio: código generado (R, BuildConfig, Room *_Impl),
+// pantallas y componentes de Compose (se prueban con androidTest) y clases que solo
+// envuelven APIs de Android (Activity, notificaciones, PDF/CSV, Firestore, base de datos).
+// ---------------------------------------------------------------------------
+jacoco {
+    toolVersion = "0.8.14"
+}
+
+val exclusionesCobertura = listOf(
+    // Código generado
+    "**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*", "**/*_Impl*.*",
+    // Interfaz Compose (pantallas, componentes, navegación y tema)
+    "**/ui/screens/**", "**/ui/components/**", "**/ui/navigation/**", "**/ui/theme/**",
+    "**/*ComposableSingletons*.*", "**/ui/model/SilosDemo*.*",
+    // Envoltorios de Android / servicios externos sin lógica propia
+    "**/MainActivity*.*", "**/SiloApp*.*", "**/data/local/AppDatabase*.*",
+    "**/data/remote/SyncRepository*.*", "**/data/remote/RetrofitClient*.*",
+    "**/notificaciones/**", "**/data/reports/**",
+)
+
+// Clases compiladas de la variante debug (Kotlin y Java), sin las exclusiones.
+val clasesCobertura = fileTree(layout.buildDirectory) {
+    include(
+        "intermediates/built_in_kotlinc/debug/**/classes/**/*.class",
+        "tmp/kotlin-classes/debug/**/*.class",
+        "intermediates/javac/debug/**/classes/**/*.class",
+    )
+    exclude(exclusionesCobertura)
+}
+
+// Archivos .exec que genera la tarea testDebugUnitTest con la cobertura registrada.
+val datosCobertura = fileTree(layout.buildDirectory) {
+    include("outputs/unit_test_code_coverage/debugUnitTest/*.exec", "jacoco/testDebugUnitTest.exec")
+}
+
+tasks.register<JacocoReport>("reporteCobertura") {
+    group = "verification"
+    description = "Ejecuta las pruebas unitarias y genera el reporte de cobertura (HTML y XML)."
+    dependsOn("testDebugUnitTest")
+    classDirectories.setFrom(clasesCobertura)
+    sourceDirectories.setFrom(files("src/main/java"))
+    executionData.setFrom(datosCobertura)
+    reports {
+        html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/cobertura/html"))
+        xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/cobertura/cobertura.xml"))
+    }
+}
+
+tasks.register<JacocoCoverageVerification>("verificarCobertura") {
+    group = "verification"
+    description = "Falla si la cobertura de líneas de la lógica es menor a 80 %."
+    dependsOn("reporteCobertura")
+    classDirectories.setFrom(clasesCobertura)
+    sourceDirectories.setFrom(files("src/main/java"))
+    executionData.setFrom(datosCobertura)
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                minimum = "0.80".toBigDecimal()
+            }
+        }
     }
 }
 
