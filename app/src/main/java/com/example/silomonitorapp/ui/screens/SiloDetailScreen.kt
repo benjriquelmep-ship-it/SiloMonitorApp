@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import com.example.silomonitorapp.ui.components.AriztiaTopBar
 import com.example.silomonitorapp.ui.components.EstadoBadge
 import com.example.silomonitorapp.ui.components.SiloNivelVertical
+import com.example.silomonitorapp.ui.components.TarjetaClima
+import com.example.silomonitorapp.ui.viewmodel.EstadoClima
 import com.example.silomonitorapp.ui.components.color
 import com.example.silomonitorapp.ui.components.formatearAutonomia
 import com.example.silomonitorapp.ui.components.MiniaturaFoto
@@ -75,6 +77,8 @@ fun SiloDetailScreen(
     onEditar: ((SiloUi) -> Unit)? = null, // null: el rol no puede editar silos
     onSolicitarCamion: ((SiloUi) -> Unit)? = null, // null: el rol no coordina reposición
     onEliminar: ((SiloUi) -> Unit)? = null, // null: el rol no puede eliminar silos
+    clima: EstadoClima? = null, // null: no se muestra la tarjeta de clima (ej. en la vista previa)
+    onReintentarClima: () -> Unit = {},
 ) {
     // Controla el diálogo de confirmación antes de eliminar.
     var confirmarEliminar by remember { mutableStateOf(false) }
@@ -173,6 +177,11 @@ fun SiloDetailScreen(
                     FilaDato("Autonomía estimada", formatearAutonomia(silo.horasAutonomia), destacado = true)
                     FilaDato("Coordenadas", "%.4f, %.4f".format(silo.latitud, silo.longitud), mostrarDivisor = false)
                 }
+            }
+
+            // Clima actual en la ubicación del silo (API externa Open-Meteo).
+            if (clima != null) {
+                TarjetaClima(estado = clima, onReintentar = onReintentarClima)
             }
 
             if (onRegistrarMovimiento != null) {

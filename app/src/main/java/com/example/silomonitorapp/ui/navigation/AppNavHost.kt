@@ -38,7 +38,9 @@ import com.example.silomonitorapp.ui.screens.SiloDetailScreen
 import com.example.silomonitorapp.ui.screens.SiloFormScreen
 import com.example.silomonitorapp.ui.screens.SiloListScreen
 import com.example.silomonitorapp.ui.screens.SolicitudesScreen
+import com.example.silomonitorapp.ui.viewmodel.ClimaViewModel
 import com.example.silomonitorapp.ui.viewmodel.SiloViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 
 // Nombres de todas las pantallas (rutas). Las funciones arman la ruta con el id del silo,
@@ -140,6 +142,12 @@ fun AppNavHost(
             // Ficha del silo: lee el id desde la ruta y observa su historial.
             val movimientos by remember(id) { viewModel.historial(id) }.collectAsState(initial = emptyList())
             val silo = silos.firstOrNull { it.id == id }
+            // API externa: clima en la ubicación GPS del silo (Open-Meteo).
+            val climaViewModel: ClimaViewModel = viewModel()
+            val clima by climaViewModel.estado.collectAsState()
+            LaunchedEffect(silo?.latitud, silo?.longitud) {
+                if (silo != null) climaViewModel.cargar(silo.latitud, silo.longitud)
+            }
             // Controla si se ve el diálogo de solicitar camión.
             var mostrarCamion by rememberSaveable { mutableStateOf(false) }
             var errorCamion by remember { mutableStateOf<String?>(null) }
@@ -179,6 +187,8 @@ fun AppNavHost(
                         }
                     }
                 } else null,
+                clima = clima,
+                onReintentarClima = { silo?.let { climaViewModel.cargar(it.latitud, it.longitud, forzar = true) } },
             )
         }
 
