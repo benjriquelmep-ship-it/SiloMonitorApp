@@ -76,6 +76,9 @@ En faenas de crianza y engorde avícola distribuidas geográficamente, el agotam
 ### 8. Notificaciones de Emergencia en Terreno
 * Disparo de notificaciones nativas locales del sistema al registrar una transacción que reduzca el stock de un silo a menos del 20%, con navegación directa hacia el detalle del silo.
 
+### 9. Clima en la Ubicación del Silo (API externa)
+* La ficha técnica muestra el clima actual en las coordenadas GPS del silo (temperatura, humedad, viento y precipitación), consultado a la API pública **Open-Meteo**, con una recomendación para la descarga del camión (por ejemplo, evitar descargar con lluvia).
+
 ---
 
 ## 🔐 Control de Acceso Basado en Roles (RBAC)
@@ -108,29 +111,157 @@ Las credenciales locales están aseguradas con cifrado de contraseñas mediante 
 
 ## 🏗 Arquitectura del Software
 
-El proyecto se fundamenta en los patrones **MVVM (Model-View-ViewModel)** y **Repository**, desacoplando la lógica de negocio pura del framework de Android y garantizando una arquitectura **Offline-First**:
+La app sigue los patrones **MVVM (Model-View-ViewModel)** y **Repository** con enfoque **Offline-First**. El backend está formado por **dos microservicios Spring Boot**, cada uno con su propia base de datos MySQL, y la app consume además una **API externa** (Open-Meteo):
 
 ```text
-┌────────────────────────────────────────────────────────┐
-│               CAPA DE PRESENTACIÓN (UI)                │
-│    Jetpack Compose | Navigation | Componentes M3       │
-└───────────────────────────▲────────────────────────────┘
-                            │ Estado (StateFlow) / Eventos
-┌───────────────────────────┴────────────────────────────┐
-│                    CAPA VIEWMODEL                      │
-│     SiloViewModel  |  SesionViewModel (Coroutines)     │
-└─────────────┬────────────────────────────┬─────────────┘
-              │ Consulta reglas puras      │ Lectura/Escritura
-┌─────────────▼───────────────┐ ┌──────────▼─────────────┐
-│       CAPA DE DOMINIO       │ │     CAPA DE DATOS      │
-│   ReglasTerreno (Validación)│ │   SiloRepositoryImpl   │
-│   Roles (Matriz permisos)   │ └──────────┬─────────────┘
-└─────────────────────────────┘            │
-                   ┌───────────────────────┴───────────────────────┐
-                   │                                               │
-       ┌───────────▼───────────┐                       ┌───────────▼───────────┐
-       │   PERSISTENCIA ROOM   │                       │   FIREBASE FIRESTORE  │
-       │    (Fuente de Verdad) │                       │ (Sincronización Cloud)│
-       │  Silos, Movimientos,  │                       │  Colas y transacciones│
-       │       Solicitudes     │                       │     asíncronas        │
-       └───────────────────────┘                       └───────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                     CAPA DE PRESENTACIÓN (UI)                        │
+│          Jetpack Compose | Navigation | Componentes Material 3       │
+└──────────────────────────────────▲───────────────────────────────────┘
+                                   │ StateFlow / eventos
+┌──────────────────────────────────┴───────────────────────────────────┐
+│                           CAPA VIEWMODEL                             │
+│        SiloViewModel  |  SesionViewModel  |  ClimaViewModel          │
+└──────────────┬──────────────────────────────────────┬────────────────┘
+               │ reglas puras                         │ datos
+┌──────────────▼─────────────────┐   ┌────────────────▼─────────────────┐
+│        CAPA DE DOMINIO         │   │          CAPA DE DATOS           │
+│ ReglasTerreno · ReglasClima    │   │  SiloRepository · ClimaRepository│
+│ ValidadorFormularios · Roles   │   └───┬─────────────┬────────────┬───┘
+└────────────────────────────────┘       │ Retrofit    │ Room       │ Retrofit
+            ┌────────────────────────────┤             │            │
+   ┌────────▼────────┐  ┌────────────────▼┐  ┌─────────▼──────┐  ┌──▼──────────────┐
+   │ ms-silos :8080  │  │ ms-solicitudes  │  │  Room (SQLite) │  │ Open-Meteo      │
+   │ silos_db (MySQL)│  │ :8081           │  │  copia local / │  │ (API externa,   │
+   │ silos y         │  │ solicitudes_db  │  │  modo offline  │  │  clima del silo)│
+   │ movimientos     │  │ (MySQL)         │  └────────────────┘  └─────────────────┘
+   └─────────────────┘  └─────────────────┘
+   Firebase Firestore: respaldo en la nube de silos y movimientos.
+```
+
+### Paquetes de la app (`app/src/main/java/com/example/silomonitorapp`)
+
+| Paquete | Contenido |
+|---|---|
+| `ui/screens`, `ui/components`, `ui/navigation`, `ui/theme` | Pantallas y componentes Compose, rutas de navegación y tema |
+| `ui/viewmodel` | `SiloViewModel`, `SesionViewModel`, `ClimaViewModel` (estado con `StateFlow`) |
+| `ui/model` | Modelos de UI (`SiloUi`, `MovimientoUi`, `SolicitudUi`…) |
+| `domain` | Reglas puras y testeables: `ReglasTerreno`, `ReglasClima`, `ValidadorFormularios`, `Roles` |
+| `data/local` | Room: entidades, DAOs, `AppDatabase` y `SiloRepository` |
+| `data/remote` | Retrofit: `RetrofitClient`, servicios `SiloApiService`, `SolicitudApiService`, `ClimaApiService`, DTOs, `ClimaRepository` |
+
+### Paquetes de cada microservicio (`backend/ms-silos`, `backend/ms-solicitudes`)
+
+`model` (entidades JPA) · `repository` (Spring Data JPA) · `service` (reglas de negocio) · `controller` (endpoints REST) · `dto` (cuerpos de petición con validaciones) · `exception` (errores → `{"error": "mensaje"}`) · `config` (datos iniciales).
+
+---
+
+## 🔌 Endpoints utilizados
+
+### Microservicio `ms-silos` — `http://localhost:8080`
+
+| Método | Endpoint | Uso en la app |
+|---|---|---|
+| GET | `/api/silos` | Descarga los silos al abrir la app y al sincronizar |
+| GET | `/api/silos/{id}` | Consulta un silo |
+| POST | `/api/silos` | Crear silo (Administrador) |
+| PUT | `/api/silos/{id}` | Editar silo (Administrador) |
+| DELETE | `/api/silos/{id}` | Eliminar silo (Administrador) |
+| GET | `/api/silos/{id}/movimientos` | Historial de cargas/consumos |
+| POST | `/api/silos/{id}/movimientos` | Registrar carga o consumo (valida sobrellenado y saldo negativo) |
+
+### Microservicio `ms-solicitudes` — `http://localhost:8081`
+
+| Método | Endpoint | Uso en la app |
+|---|---|---|
+| GET | `/api/solicitudes` (`?siloId=SIL-001` opcional) | Bandeja de reposición (pendientes primero) |
+| GET | `/api/solicitudes/{id}` | Consulta una solicitud |
+| POST | `/api/solicitudes` | Solicitar camión (Supervisor/Admin). 409 si el silo ya tiene un camión pendiente |
+| PATCH | `/api/solicitudes/{id}/revision` | Aprobar o rechazar (Jefatura/Admin). 409 si ya fue revisada |
+| DELETE | `/api/solicitudes/{id}` | Eliminar una solicitud |
+
+Errores de ambos microservicios: `400` (validación), `404` (no existe), `409` (regla de negocio), siempre con el cuerpo `{"error": "mensaje"}` que la app muestra al usuario.
+
+### API externa — Open-Meteo (`https://api.open-meteo.com`)
+
+| Método | Endpoint | Uso en la app |
+|---|---|---|
+| GET | `/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,weather_code&timezone=auto` | Tarjeta **"Clima en el silo"** de la ficha técnica: temperatura, humedad, viento, precipitación y una recomendación para la descarga del camión |
+
+Es un servicio público y gratuito (no requiere API key). Se consume con Retrofit (`ClimaApiService`) y **no** guarda nada en Room ni en los microservicios: solo se consulta al abrir la ficha.
+
+---
+
+## ▶️ Pasos para ejecutar
+
+### 1. Base de datos
+Iniciar **MySQL** (por ejemplo con XAMPP) en el puerto `3306`, usuario `root` sin contraseña. Las bases `silos_db` y `solicitudes_db` se crean solas al iniciar cada microservicio.
+
+### 2. Microservicios (Java 17+)
+Abrir cada carpeta en IntelliJ IDEA y ejecutar su clase principal, o desde una terminal:
+
+```bash
+cd backend/ms-silos        && mvn spring-boot:run   # http://localhost:8080
+cd backend/ms-solicitudes  && mvn spring-boot:run   # http://localhost:8081
+```
+
+Prueba rápida: abrir `http://localhost:8080/api/silos` y `http://localhost:8081/api/solicitudes` en el navegador.
+
+### 3. App Android
+1. Abrir la carpeta raíz del proyecto en **Android Studio** y sincronizar Gradle.
+2. Crear/editar `local.properties` (no se sube al repositorio):
+   ```properties
+   MAPS_API_KEY=tu_api_key_de_google_maps
+   # Solo con celular físico (en el emulador no hace falta): IP del PC en la misma red Wi-Fi
+   # API_SILOS_URL=http://192.168.1.50:8080/
+   # API_SOLICITUDES_URL=http://192.168.1.50:8081/
+   ```
+3. Ejecutar en un emulador o dispositivo (▶ Run). En el emulador, `10.0.2.2` apunta al `localhost` del PC.
+4. Iniciar sesión con una de las cuentas de demostración.
+
+---
+
+## 🧪 Pruebas unitarias y cobertura
+
+| Módulo | Herramientas | Qué se prueba |
+|---|---|---|
+| App (`app/src/test`) | JUnit 5 + JUnit 4, MockK, Kotest, Coroutines Test | ViewModels (`SiloViewModel`, `ClimaViewModel`), repositorios (`SiloRepository`, solicitudes, `ClimaRepository`), modelos de UI y reglas de dominio |
+| `ms-silos` / `ms-solicitudes` | JUnit 5 + Mockito | Reglas de negocio de cada `Service` |
+
+Las APIs (Retrofit) y Room se reemplazan por **mocks**, por lo que las pruebas no necesitan internet, microservicios encendidos ni emulador.
+
+```bash
+./gradlew testDebugUnitTest      # ejecuta las pruebas de la app
+./gradlew reporteCobertura       # reporte: app/build/reports/cobertura/html/index.html
+./gradlew verificarCobertura     # falla si la cobertura de líneas de la lógica es < 80 %
+cd backend/ms-solicitudes && mvn test
+```
+
+El reporte de cobertura mide la **lógica** (ViewModels, repositorios, dominio, DTOs) y excluye el código generado (R, BuildConfig, Room `*_Impl`), las pantallas Compose (se prueban con `androidTest`) y las clases que solo envuelven APIs de Android (Activity, notificaciones, PDF/CSV, Firestore).
+
+<!-- Agregar aquí una captura del reporte de cobertura: ![Cobertura](docs/cobertura.png) -->
+
+---
+
+## 📦 APK firmado
+
+<!-- Completar cuando se genere el APK firmado -->
+1. Android Studio → **Build → Generate Signed App Bundle / APK… → APK**.
+2. Crear la llave (`Create new…`): archivo `.jks`, contraseña, alias y datos del certificado.
+3. Elegir la variante **release** y finalizar. El APK queda en `app/release/app-release.apk`.
+
+Captura del APK firmado y del archivo `.jks`:
+
+<!-- ![APK firmado](docs/apk-firmado.png) -->
+
+---
+
+## 📋 Planificación (Trello) y control de versiones
+
+* **Tablero Trello:** <!-- pegar aquí el enlace al tablero -->
+* **GitHub:** trabajo por ramas (`feature/*`, `fix/*`, `docs/*`) integradas a `master` mediante Pull Requests.
+
+| Integrante | Responsabilidades principales |
+|---|---|
+| Benjamín Riquelme | <!-- completar --> |
+| Aileen Oyaneder | <!-- completar --> |
