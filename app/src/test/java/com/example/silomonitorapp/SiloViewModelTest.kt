@@ -62,6 +62,7 @@ class SiloViewModelTest {
         every { repository.solicitudesFlow } returns flowOf(emptyList())
         coEvery { repository.precargarSilosSiEstaVacio() } just Runs
         coEvery { repository.sincronizarConServidor() } returns Result.success(0)
+        coEvery { repository.sincronizarSolicitudes() } returns Result.success(0)
         coEvery { syncRepository.sincronizarTodo() } returns ResultadoSync(exitoso = true)
     }
 
@@ -126,5 +127,49 @@ class SiloViewModelTest {
 
         eliminado shouldBe true
         viewModel.mensajeOperacion.value shouldBe "Silo SIL-001 eliminado"
+    }
+
+    @Test
+    fun `sincronizar informa las solicitudes enviadas a ms-solicitudes`() = runTest(testDispatcher) {
+        val viewModel = SiloViewModel(application, repository, syncRepository)
+        advanceUntilIdle()
+        coEvery { repository.sincronizarSolicitudes() } returns Result.success(3)
+
+        viewModel.sincronizar()
+        advanceUntilIdle()
+
+        viewModel.mensajeOperacion.value shouldBe "Silos actualizados desde el servidor y 3 solicitudes"
+    }
+
+    @Test
+    fun `solicitar camion exitoso devuelve null y confirma`() = runTest(testDispatcher) {
+        coEvery { repository.solicitarCamion("SIL-001", 500.0, true, "Nivel bajo", "supervisor") } returns Result.success(Unit)
+        val viewModel = SiloViewModel(application, repository, syncRepository)
+        advanceUntilIdle()
+
+        viewModel.solicitarCamion("SIL-001", 500.0, true, "  Nivel bajo ", "supervisor") shouldBe null
+        viewModel.mensajeOperacion.value shouldContain "Camión solicitado"
+    }
+
+    @Test
+    fun `solicitar camion rechazado devuelve el mensaje de error`() = runTest(testDispatcher) {
+        coEvery { repository.solicitarCamion(any(), any(), any(), any(), any()) } returns
+                Result.failure(Exception("Ya hay un camión pendiente de aprobación para este silo."))
+        val viewModel = SiloViewModel(application, repository, syncRepository)
+        advanceUntilIdle()
+
+        viewModel.solicitarCamion("SIL-001", 500.0, false, "", "supervisor") shouldContain "camión pendiente"
+    }
+
+    @Test
+    fun `revisar solicitud aprobada muestra confirmacion`() = runTest(testDispatcher) {
+        coEvery { repository.revisarSolicitud(7L, true, "jefatura") } returns Result.success(Unit)
+        val viewModel = SiloViewModel(application, repository, syncRepository)
+        advanceUntilIdle()
+
+        viewModel.revisarSolicitud(7L, aprobada = true, usuario = "jefatura")
+        advanceUntilIdle()
+
+        viewModel.mensajeOperacion.value shouldBe "Reposición aprobada"
     }
 }

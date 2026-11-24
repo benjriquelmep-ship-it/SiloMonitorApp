@@ -62,7 +62,8 @@ class SiloRepositoryTest {
         // La transacción de Room se simula ejecutando directamente el bloque.
         every { db.runInTransaction(any<Runnable>()) } answers { firstArg<Runnable>().run() }
 
-        repository = SiloRepository(db, api)
+        // Las solicitudes de camión se prueban en SolicitudesRepositoryTest: aquí basta un mock relajado.
+        repository = SiloRepository(db, api, mockk(relaxed = true))
     }
 
     // Crea un error HTTP como el que manda el GlobalExceptionHandler del microservicio.
